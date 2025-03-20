@@ -1,10 +1,11 @@
-# 定义 LED 输出引脚
 from machine import Pin, Timer, deepsleep
 import time
 import esp32
 from ble_hid import HID
 from collections import namedtuple
 
+
+MY_HID_NAME = 'ble_keyboard_mouse'
 led_pin = Pin(2, Pin.OUT)
 
 # 定义按键事件
@@ -82,7 +83,11 @@ button_pins = [
 
 POWER_PIN = Pin(26, Pin.IN, Pin.PULL_UP)
 
-DEEP_SLEEP_TIME = 900  # 秒
+DEEP_SLEEP_TIME = 900
+# 秒
+
+# 设置超时时间（秒）
+CONNECT_TIMEOUT = 180
 
 # 自动按键状态
 auto_press_enabled = [False] * len(button_pins)
@@ -102,11 +107,11 @@ debounce_delay = 0
 # 定时器列表
 timers = {}
 
-sleeptimer = Timer(-1)
+sleeptimer = Timer(0)
 
 # 定义定时器中断处理函数，进入深度睡眠模式
 def go_to_deep_sleep(timer):
-    print("进入深度睡眠模式...")
+    print("deep sleeping...")
     time.sleep(1)
     # 配置 ESP32 在 GPIO 引脚上检测到电平变化时唤醒
     esp32.wake_on_ext0(pin=POWER_PIN, level=esp32.WAKEUP_ALL_LOW)
@@ -155,17 +160,13 @@ def execute_events(events):
             time.sleep_ms(event.delay)  # 延迟执行后续事件
 
 def handle_button_press(button_index):
-    global button_macros, timers, sleeptimer, ble_hid, auto_press_enabled, last_press_time, long_press_enabled, debounce_delay, button_states
+    global button_macros, timers, ble_hid, auto_press_enabled, last_press_time, long_press_enabled, debounce_delay, button_states
 
     # 消抖处理
     if (time.ticks_ms() - last_press_time[button_index]) < debounce_delay:
         return
 
     last_press_time[button_index] = time.ticks_ms()
-
-    # 重置定时器
-    sleeptimer.deinit()
-    sleeptimer.init(mode=Timer.ONE_SHOT, period=DEEP_SLEEP_TIME * 1000, callback=go_to_deep_sleep)
 
     macro = button_macros[button_index]
 
@@ -178,7 +179,7 @@ def handle_button_press(button_index):
         if auto_press_enabled[button_index]:
             # 启动定时器
             timer_id = (button_index, "auto")  # 创建唯一的定时器 ID
-            timers[timer_id] = Timer(-1)  # 创建一个新的定时器
+            timers[timer_id] = Timer(button_index + 1)  # 创建一个新的定时器，使用正整数 ID
             timers[timer_id].init(period=macro.auto_interval, mode=Timer.PERIODIC, callback=lambda t: auto_key_press(button_index))
         else:
             # 停止定时器
@@ -186,7 +187,6 @@ def handle_button_press(button_index):
             if timer_id in timers:
                 timers[timer_id].deinit()
                 del timers[timer_id]
-
         return  # 停止当前事件的处理
 
     # 如果 long_press 为 1，则执行长按操作
@@ -331,12 +331,13 @@ def button_callback(pin):
     # 消抖处理
     if (time.ticks_ms() - last_press_time[button_index]) < debounce_delay:
         return
-    #print("Press")
+
     last_press_time[button_index] = time.ticks_ms()
 
     macro = button_macros[button_index]
 
     if current_state == 0 and button_states[button_index] == 1:
+        #print("Press")
         button_states[button_index] = 0
         # 按键按下
         
@@ -432,22 +433,27 @@ class MyHID(HID):  # 继承现有的 HID 类
         '''按下按键'''
         self.saved_special_keys = self.pressed_special_keys.copy()
         self.keyboard_notify(special, general, pressed=True)
+        stop_sleep_timer()
 
     def key_release(self, special=0, general=0):
         '''释放按键'''
         self.keyboard_notify(special, general, pressed=False)
         self.pressed_special_keys = self.saved_special_keys.copy()
+        reset_sleep_timer()  # 重置睡眠定时器
     def mouse_press(self, button=b'\x01'):
         '''按下鼠标按键'''
         self.mouse_notify(keys=button)
+        stop_sleep_timer()
 
     def mouse_release(self, button=b'\x00'):
         '''释放鼠标按键'''
         self.mouse_notify(keys=button)
+        reset_sleep_timer()
     def mouse_click(self, button=b'\x01'):
         '''鼠标单击'''
         self.mouse_notify(keys=button)  # 按下鼠标按键
         self.mouse_notify(keys=b'\x00')  # 释放鼠标按键
+        reset_sleep_timer()
     def release_all_keys(self):
         '''释放所有键盘按键'''
         # self.keyboard_notify(special=0, general=0, pressed=False)  #  这个方法可能不再适用
@@ -455,7 +461,9 @@ class MyHID(HID):  # 继承现有的 HID 类
         self.pressed_general_keys.clear()
         self.keyboard_notify(special=0, general=0, pressed=False)
         
-ble_hid = MyHID('ble_keyboard_mouse')  # 使用 MyHID 类
+ble_hid = MyHID(MY_HID_NAME)  # 使用 MyHID 类
+
+start_time = time.time()  # 记录开始时间
 
 while True:
     if ble_hid.is_connected():
@@ -463,7 +471,14 @@ while True:
         blink_timer.deinit()
         led_pin.value(1)
         break
+    
     time.sleep(0.1)
+
+    # 检查是否超时
+    if time.time() - start_time > CONNECT_TIMEOUT:
+        print("connect timeout,sleeping")
+        go_to_deep_sleep(None)
+        break
 
 print("Loaded")
 
@@ -471,8 +486,20 @@ print("Loaded")
 for pin in button_pins:
     pin.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=button_callback)
 
-# 启动定时器
-sleeptimer.init(mode=Timer.ONE_SHOT, period=DEEP_SLEEP_TIME * 1000, callback=go_to_deep_sleep)
 
+#sleeptimer.init(mode=Timer.ONE_SHOT, period=DEEP_SLEEP_TIME * 1000, callback=go_to_deep_sleep)
+def stop_sleep_timer():
+    global sleeptimer
+    #print("sleep stop")
+    sleeptimer.deinit()
+    
+def reset_sleep_timer():
+    global sleeptimer
+    #print("sleep reset")
+    sleeptimer.deinit()
+    sleeptimer.init(mode=Timer.ONE_SHOT, period=DEEP_SLEEP_TIME * 1000, callback=go_to_deep_sleep)
+    
+# 启动定时器    
+reset_sleep_timer()
 while True:
     time.sleep(0.01)
