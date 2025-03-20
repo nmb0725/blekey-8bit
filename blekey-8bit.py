@@ -7,71 +7,83 @@ from collections import namedtuple
 
 MY_HID_NAME = 'ble_keyboard_mouse'
 led_pin = Pin(2, Pin.OUT)
-
+# 0x00: No modifier
+# 0x01: CTRL, 10 Rctrl
+#ctrl 左是04,需要附加, cap 是 39 ,tab 是 2B,SPACE是2C,ENTER是28 ,R是15,E是08,T是17,U是18
+# 自动按键状态
+# 0x00: No modifier
+# 0x01: CTRL (Left Control)
+# 0x02: SHIFT (Left Shift)
+# 0x03: CTRL + SHIFT
+# 0x04: ALT (Left Alt)
+# 创建按键宏实例
 # 定义按键事件
 KeyEvent = namedtuple("KeyEvent", ["delay", "action", "modifier", "keycode"])
 MouseEvent = namedtuple("MouseEvent", ["delay", "action", "button"])
 MouseMoveEvent = namedtuple("MouseMoveEvent", ["delay", "action", "x", "y"])
 WheelEvent = namedtuple("WheelEvent", ["delay", "action", "delta"])
 DelayEvent = namedtuple("DelayEvent", ["delay", "action"])
-KeyMacro = namedtuple("KeyMacro", ["events", "auto_interval", "long_press", "key", "modifiers"])
+KeyMacro = namedtuple("KeyMacro", ["events", "auto_interval", "long_press", "key", "modifiers", "button"])
+
 
 # 定义按键宏
 LONG_PRESS_R = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x15),
     DelayEvent(delay=1000, action="delay"),
     KeyEvent(delay=0, action="release", modifier=0x00, keycode=0x15)
-], auto_interval=0, long_press=0, key=None, modifiers=0x00)
+], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
 
 CTRL_R = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x10, keycode=0x00),
-], auto_interval=0, long_press=0, key=None, modifiers=0x00)
+], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
 
 R_AUTO = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x15),
     KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x15)
-], auto_interval=150, long_press=0, key=None, modifiers=0x00)
+], auto_interval=150, long_press=0, key=None, modifiers=0x00,button=None)
 
 E = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x08),  # 按下 E 键，立即执行
     DelayEvent(delay=0, action="delay"),
     KeyEvent(delay=0, action="release", modifier=0x00, keycode=0x08)  # 释放 E 键，立即执行
-], auto_interval=0, long_press=1, key=None, modifiers=0x00)
+], auto_interval=0, long_press=1, key=None, modifiers=0x00,button=None)
 
 CTRL_SHIFT_T = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x03, keycode=0x17),
     DelayEvent(delay=0, action="delay"),
     KeyEvent(delay=0, action="release", modifier=0x03, keycode=0x17)
-], auto_interval=0, long_press=0, key=None, modifiers=0x00)
+], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
 
 ALT_R = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x04, keycode=0x15),
     DelayEvent(delay=0, action="delay"),
     KeyEvent(delay=0, action="release", modifier=0x04, keycode=0x15)
-], auto_interval=0, long_press=0, key=None, modifiers=0x00)
+], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
 
 LEFT_CLICK = KeyMacro(events=[
     MouseEvent(delay=0, action="press", button="left"),
     MouseEvent(delay=50, action="release", button="left")
-], auto_interval=0, long_press=0, key=None, modifiers=0x00)
+], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
+
+MIDDLE_CLICK = KeyMacro(events=[], auto_interval=0, long_press=0, key=None, modifiers=0x00,button="middle")
 
 WHEEL_UP = KeyMacro(events=[
     WheelEvent(delay=0, action="scroll", delta=120)
-], auto_interval=0, long_press=0, key=None, modifiers=0x00)
+], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
 
 LEFT_CLICK_AUTO = KeyMacro(events=[
     MouseEvent(delay=0, action="press", button="left"),
     MouseEvent(delay=50, action="release", button="left")
-], auto_interval=100, long_press=0, key=None, modifiers=0x00)
+], auto_interval=100, long_press=0, key=None, modifiers=0x00,button=None)
 
 MOUSE_MOVE_RIGHT = KeyMacro(events=[
     MouseMoveEvent(delay=0, action="move", x=10, y=0)
-], auto_interval=0, long_press=0, key=None, modifiers=0x00)
+], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
 
-CTRL = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x00, modifiers=0x01) # CTRL 映射
-
+CTRL = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x00, modifiers=0x01,button=None) # CTRL 映射
+TAB = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x2B, modifiers=0x00,button=None) # CTRL 映射
 # 定义按键对应的宏
-button_macros = [CTRL, R_AUTO, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
+button_macros = [TAB, MIDDLE_CLICK,R_AUTO, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
 
 # 定义按键输入引脚
 button_pins = [
@@ -135,7 +147,7 @@ def execute_events(events):
             delay = event.delay
             action = event.action
             button = event.button
-
+            
             # 根据不同的 action 执行不同的操作
             if action == "press":
                 ble_hid.mouse_press(get_mouse_button_code(button))
@@ -345,6 +357,10 @@ def button_callback(pin):
 
         if macro.key is not None:  # 如果定义了要模拟的键
             ble_hid.key_press(special=macro.modifiers, general=macro.key)  # 模拟组合键按下
+        elif macro.button is not None:
+            # 执行鼠标按键操作
+            #print("mouse press" )
+            ble_hid.mouse_press(get_mouse_button_code(macro.button))
         else:
             handle_button_press(button_index)  # 处理其他按键事件
 
@@ -355,6 +371,10 @@ def button_callback(pin):
         
         if macro.key is not None:  # 如果定义了要模拟的键
             ble_hid.key_release(special=macro.modifiers, general=macro.key)  # 模拟组合键松开
+        elif macro.button is not None:
+            # 执行鼠标按键操作
+            #print("mouse release" )
+            ble_hid.mouse_release(get_mouse_button_code(macro.button))
         # 停止长按
         long_press_enabled[button_index] = False
         ble_hid.release_all_keys()
@@ -419,11 +439,11 @@ class MyHID(HID):  # 继承现有的 HID 类
             self._ble.gatts_notify(self.conn_handle, self.k_rep, bytes([_special & 0xFF, 0]) + _keys)
 
 
-    def mouse_notify(self, keys=b'\x00', move=(0, 0), wheel=0):
+    def mouse_notify(self, keys=0x00, move=(0, 0), wheel=0):
         '''鼠标 按键*8 + 位移 + 滚轮'''
         if self.is_connected():
             _mouse_data = bytearray(4)
-            _mouse_data[0] = keys[0] if len(keys) > 0 else 0x00  # 使用第一个字节表示按键状态
+            _mouse_data[0] = keys  # 使用第一个字节表示按键状态
             _mouse_data[1] = move[0] & 0xFF
             _mouse_data[2] = move[1] & 0xFF
             _mouse_data[3] = wheel & 0xFF
@@ -440,19 +460,19 @@ class MyHID(HID):  # 继承现有的 HID 类
         self.keyboard_notify(special, general, pressed=False)
         self.pressed_special_keys = self.saved_special_keys.copy()
         reset_sleep_timer()  # 重置睡眠定时器
-    def mouse_press(self, button=b'\x01'):
+    def mouse_press(self, button=0x01):
         '''按下鼠标按键'''
         self.mouse_notify(keys=button)
         stop_sleep_timer()
 
-    def mouse_release(self, button=b'\x00'):
+    def mouse_release(self, button=0x00):
         '''释放鼠标按键'''
-        self.mouse_notify(keys=button)
+        self.mouse_notify(keys=0x00)
         reset_sleep_timer()
-    def mouse_click(self, button=b'\x01'):
+    def mouse_click(self, button=0x01):
         '''鼠标单击'''
         self.mouse_notify(keys=button)  # 按下鼠标按键
-        self.mouse_notify(keys=b'\x00')  # 释放鼠标按键
+        self.mouse_notify(keys=0x00)  # 释放鼠标按键
         reset_sleep_timer()
     def release_all_keys(self):
         '''释放所有键盘按键'''
@@ -503,3 +523,4 @@ def reset_sleep_timer():
 reset_sleep_timer()
 while True:
     time.sleep(0.01)
+
