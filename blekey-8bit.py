@@ -1,9 +1,14 @@
-from machine import Pin, Timer, deepsleep
+from machine import Pin, Timer, deepsleep, freq
 import time
 import esp32
 from ble_hid import HID
 from collections import namedtuple
+import network
 
+wlan = network.WLAN(network.STA_IF)
+wlan.active(False)
+# 降低 CPU 频率到 80MHz
+freq(80000000)
 
 MY_HID_NAME = 'ble_keyboard_mouse'
 led_pin = Pin(2, Pin.OUT)
@@ -81,9 +86,10 @@ MOUSE_MOVE_RIGHT = KeyMacro(events=[
 ], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
 
 CTRL = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x00, modifiers=0x01,button=None) # CTRL 映射
-TAB = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x2B, modifiers=0x00,button=None) # CTRL 映射
+TAB = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x2B, modifiers=0x00,button=None) # tab 映射
+CAPS = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x39, modifiers=0x00,button=None) # CAPS 映射
 # 定义按键对应的宏
-button_macros = [TAB, MIDDLE_CLICK,R_AUTO, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
+button_macros = [CAPS, MIDDLE_CLICK,R_AUTO, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
 
 # 定义按键输入引脚
 button_pins = [
@@ -522,5 +528,4 @@ def reset_sleep_timer():
 # 启动定时器    
 reset_sleep_timer()
 while True:
-    time.sleep(0.01)
-
+    time.sleep(0.1)
