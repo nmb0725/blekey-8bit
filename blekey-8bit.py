@@ -21,6 +21,7 @@ led_pin = Pin(2, Pin.OUT)
 # 0x02: SHIFT (Left Shift)
 # 0x03: CTRL + SHIFT
 # 0x04: ALT (Left Alt)
+#0x45 F12
 # 创建按键宏实例
 # 定义按键事件
 KeyEvent = namedtuple("KeyEvent", ["delay", "action", "modifier", "keycode"])
@@ -86,10 +87,11 @@ MOUSE_MOVE_RIGHT = KeyMacro(events=[
 ], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
 
 CTRL = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x00, modifiers=0x01,button=None) # CTRL 映射
+F12 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x45, modifiers=0x00,button=None) # f12 映射
 TAB = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x2B, modifiers=0x00,button=None) # tab 映射
 CAPS = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x39, modifiers=0x00,button=None) # CAPS 映射
 # 定义按键对应的宏
-button_macros = [CAPS, MIDDLE_CLICK,R_AUTO, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
+button_macros = [F12, MIDDLE_CLICK,R_AUTO,CAPS, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
 
 # 定义按键输入引脚
 button_pins = [
@@ -101,11 +103,11 @@ button_pins = [
 
 POWER_PIN = Pin(26, Pin.IN, Pin.PULL_UP)
 
-DEEP_SLEEP_TIME = 900
+DEEP_SLEEP_TIME = 3600
 # 秒
 
 # 设置超时时间（秒）
-CONNECT_TIMEOUT = 180
+CONNECT_TIMEOUT = 300
 
 # 自动按键状态
 auto_press_enabled = [False] * len(button_pins)
@@ -529,3 +531,4 @@ def reset_sleep_timer():
 reset_sleep_timer()
 while True:
     time.sleep(0.1)
+
