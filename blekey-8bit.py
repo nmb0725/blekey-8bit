@@ -90,20 +90,32 @@ CTRL = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x00, modifiers=0x
 F12 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x45, modifiers=0x00,button=None) # f12 映射
 TAB = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x2B, modifiers=0x00,button=None) # tab 映射
 CAPS = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x39, modifiers=0x00,button=None) # CAPS 映射
+LEFT = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x50, modifiers=0x00,button=None) # tab 映射
+RIGHT = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x4F, modifiers=0x00,button=None) # CAPS 映射
+UP = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x52, modifiers=0x00,button=None) # tab 映射
+DOWN = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x51, modifiers=0x00,button=None) # CAPS 映射
 # 定义按键对应的宏
-button_macros = [F12, MIDDLE_CLICK,R_AUTO,CAPS, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
-
+#button_macros = [F12, MIDDLE_CLICK,CAPS, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
+button_macros = [F12, MIDDLE_CLICK,UP,LEFT,RIGHT,DOWN]
 # 定义按键输入引脚
 button_pins = [
+    Pin(5, Pin.IN, Pin.PULL_UP),
+    Pin(18, Pin.IN, Pin.PULL_UP),
     Pin(25, Pin.IN, Pin.PULL_UP),
     Pin(26, Pin.IN, Pin.PULL_UP),
-    Pin(27, Pin.IN, Pin.PULL_UP),
-    Pin(14, Pin.IN, Pin.PULL_UP)
+    Pin(12, Pin.IN, Pin.PULL_UP),
+    Pin(13, Pin.IN, Pin.PULL_UP)
+
 ]
+    
+#SET GND        
+Pin(19, Pin.OUT, 0)
+Pin(21, Pin.OUT, 0)
+Pin(27, Pin.OUT, 0) 
 
-POWER_PIN = Pin(26, Pin.IN, Pin.PULL_UP)
+POWER_PIN = Pin(5, Pin.IN, Pin.PULL_UP)
 
-DEEP_SLEEP_TIME = 3600
+DEEP_SLEEP_TIME = 7200
 # 秒
 
 # 设置超时时间（秒）
@@ -357,11 +369,11 @@ def button_callback(pin):
     macro = button_macros[button_index]
 
     if current_state == 0 and button_states[button_index] == 1:
-        #print("Press")
+        print("Press")
         button_states[button_index] = 0
         # 按键按下
         
-        #print("Press key {}: {}".format(button_index + 1,""))
+        print("Press key {}: {}".format(button_index + 1,""))
 
         if macro.key is not None:  # 如果定义了要模拟的键
             ble_hid.key_press(special=macro.modifiers, general=macro.key)  # 模拟组合键按下
@@ -532,3 +544,4 @@ reset_sleep_timer()
 while True:
     time.sleep(0.1)
 
+# 
