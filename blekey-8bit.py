@@ -33,20 +33,24 @@ KeyMacro = namedtuple("KeyMacro", ["events", "auto_interval", "long_press", "key
 
 
 # 定义按键宏
+#auto_interval 是间隔时间自动执行, LONG_PRESS是做长按, 2个都加是按住时触发
 LONG_PRESS_R = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x15),
     DelayEvent(delay=1000, action="delay"),
     KeyEvent(delay=0, action="release", modifier=0x00, keycode=0x15)
-], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
+], auto_interval=0, long_press=1, key=None, modifiers=0x00,button=None)
 
-CTRL_R = KeyMacro(events=[
-    KeyEvent(delay=0, action="press", modifier=0x10, keycode=0x00),
-], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
-
+#开关型 自动R
 R_AUTO = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x15),
     KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x15)
 ], auto_interval=150, long_press=0, key=None, modifiers=0x00,button=None)
+
+
+F11_AUTO = KeyMacro(events=[
+    KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x44),
+    KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x44)
+], auto_interval=50, long_press=1, key=None, modifiers=0x00,button=None)
 
 E = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x08),  # 按下 E 键，立即执行
@@ -87,6 +91,7 @@ MOUSE_MOVE_RIGHT = KeyMacro(events=[
 ], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
 
 CTRL = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x00, modifiers=0x01,button=None) # CTRL 映射
+F11 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x44, modifiers=0x00,button=None) # f11 映射
 F12 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x45, modifiers=0x00,button=None) # f12 映射
 TAB = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x2B, modifiers=0x00,button=None) # tab 映射
 CAPS = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x39, modifiers=0x00,button=None) # CAPS 映射
@@ -96,7 +101,7 @@ UP = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x52, modifiers=0x00
 DOWN = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x51, modifiers=0x00,button=None) # CAPS 映射
 # 定义按键对应的宏
 #button_macros = [F12, MIDDLE_CLICK,CAPS, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
-button_macros = [F12, MIDDLE_CLICK,UP,LEFT,RIGHT,DOWN]
+button_macros = [F12,F11_AUTO,LEFT,DOWN,UP,RIGHT]
 # 定义按键输入引脚
 button_pins = [
     Pin(5, Pin.IN, Pin.PULL_UP),
@@ -387,7 +392,7 @@ def button_callback(pin):
     elif current_state == 1 and button_states[button_index] == 0:
         button_states[button_index] = 1
         # 按键松开
-        #print("Release key {}: {}".format(button_index + 1, ""))
+        print("Release key {}: {}".format(button_index + 1, ""))
         
         if macro.key is not None:  # 如果定义了要模拟的键
             ble_hid.key_release(special=macro.modifiers, general=macro.key)  # 模拟组合键松开
@@ -395,6 +400,9 @@ def button_callback(pin):
             # 执行鼠标按键操作
             #print("mouse release" )
             ble_hid.mouse_release(get_mouse_button_code(macro.button))
+        elif macro.auto_interval > 0  and macro.long_press == 1:
+            handle_button_press(button_index)  # 处理其他按键事件
+            
         # 停止长按
         long_press_enabled[button_index] = False
         ble_hid.release_all_keys()
@@ -545,3 +553,4 @@ while True:
     time.sleep(0.1)
 
 # 
+
