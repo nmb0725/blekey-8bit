@@ -14,7 +14,8 @@ MY_HID_NAME = 'ble_keyboard_mouse'
 led_pin = Pin(2, Pin.OUT)
 # 0x00: No modifier
 # 0x01: CTRL, 10 Rctrl
-#ctrl 左是04,需要附加, cap 是 39 ,tab 是 2B,SPACE是2C,ENTER是28 ,R是15,E是08,T是17,U是18
+#ctrl 左是04,需要附加, cap 是 39 ,tab 是 2B,SPACE是2C,ENTER是28 ,R是15,E是08,T是17,U是18+
+#2 1F  ,4 21
 # 自动按键状态
 # 0x00: No modifier
 # 0x01: CTRL (Left Control)
@@ -51,6 +52,17 @@ F11_AUTO = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x44),
     KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x44)
 ], auto_interval=50, long_press=1, key=None, modifiers=0x00,button=None)
+
+AUTO_2 = KeyMacro(events=[
+    KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x1F),
+    KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x1F)
+], auto_interval=50, long_press=1, key=None, modifiers=0x00,button=None)
+
+AUTO_4 = KeyMacro(events=[
+    KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x21),
+    KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x21)
+], auto_interval=50, long_press=1, key=None, modifiers=0x00,button=None)
+
 
 E = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x08),  # 按下 E 键，立即执行
@@ -101,15 +113,16 @@ UP = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x52, modifiers=0x00
 DOWN = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x51, modifiers=0x00,button=None) # CAPS 映射
 # 定义按键对应的宏
 #button_macros = [F12, MIDDLE_CLICK,CAPS, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
-button_macros = [F12,F11_AUTO,LEFT,DOWN,UP,RIGHT]
+button_macros = [F12,F11_AUTO,LEFT,AUTO_4,AUTO_2,RIGHT]
+
 # 定义按键输入引脚
 button_pins = [
     Pin(5, Pin.IN, Pin.PULL_UP),
     Pin(18, Pin.IN, Pin.PULL_UP),
-    Pin(25, Pin.IN, Pin.PULL_UP),
-    Pin(26, Pin.IN, Pin.PULL_UP),
-    Pin(12, Pin.IN, Pin.PULL_UP),
-    Pin(13, Pin.IN, Pin.PULL_UP)
+    Pin(25, Pin.IN, Pin.PULL_UP),#left
+    Pin(26, Pin.IN, Pin.PULL_UP),#down
+    Pin(12, Pin.IN, Pin.PULL_UP),  #up
+    Pin(13, Pin.IN, Pin.PULL_UP) #right
 
 ]
     
@@ -216,10 +229,13 @@ def handle_button_press(button_index):
         if auto_press_enabled[button_index]:
             # 启动定时器
             timer_id = (button_index, "auto")  # 创建唯一的定时器 ID
-            timers[timer_id] = Timer(button_index + 1)  # 创建一个新的定时器，使用正整数 ID
+            #print("on" ,button_index)
+            #timers[timer_id] = Timer(button_index + 1)  # 创建一个新的定时器，使用正整数 ID
+            timers[timer_id] = Timer(-1) 
             timers[timer_id].init(period=macro.auto_interval, mode=Timer.PERIODIC, callback=lambda t: auto_key_press(button_index))
         else:
             # 停止定时器
+           # print("off" ,button_index)
             timer_id = (button_index, "auto")
             if timer_id in timers:
                 timers[timer_id].deinit()
@@ -301,9 +317,7 @@ def delayed_action(button_index, event_index, timer_id):
 
 def auto_key_press(button_index):
     global button_macros, ble_hid, last_press_time
-
     macro = button_macros[button_index]
-
     # 遍历按键事件
     for i, event in enumerate(macro.events):
         if isinstance(event, KeyEvent):
@@ -553,4 +567,5 @@ while True:
     time.sleep(0.1)
 
 # 
+
 
