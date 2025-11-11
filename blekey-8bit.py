@@ -34,7 +34,7 @@ KeyMacro = namedtuple("KeyMacro", ["events", "auto_interval", "long_press", "key
 
 
 # 定义按键宏
-#auto_interval 是间隔时间自动执行, LONG_PRESS是做长按, 2个都加是按住时触发
+#auto_interval 是间隔时间自动执行, LONG_PRESS是做长按, 2个都加是键按住时触发
 LONG_PRESS_R = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x15),
     DelayEvent(delay=1000, action="delay"),
@@ -47,6 +47,10 @@ R_AUTO = KeyMacro(events=[
     KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x15)
 ], auto_interval=150, long_press=0, key=None, modifiers=0x00,button=None)
 
+F12_AUTO = KeyMacro(events=[
+    KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x45),
+    KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x45)
+], auto_interval=50, long_press=1, key=None, modifiers=0x00,button=None)
 
 F11_AUTO = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x44),
@@ -113,7 +117,7 @@ UP = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x52, modifiers=0x00
 DOWN = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x51, modifiers=0x00,button=None) # CAPS 映射
 # 定义按键对应的宏
 #button_macros = [F12, MIDDLE_CLICK,CAPS, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
-button_macros = [F12,F11_AUTO,LEFT,AUTO_4,AUTO_2,RIGHT]
+button_macros = [F12_AUTO,F11_AUTO,LEFT,AUTO_4,AUTO_2,RIGHT]
 
 # 定义按键输入引脚
 button_pins = [
@@ -157,7 +161,7 @@ debounce_delay = 0
 # 定时器列表
 timers = {}
 
-sleeptimer = Timer(0)
+sleeptimer = Timer(-1)
 
 # 定义定时器中断处理函数，进入深度睡眠模式
 def go_to_deep_sleep(timer):
@@ -226,12 +230,12 @@ def handle_button_press(button_index):
         auto_press_enabled[button_index] = not auto_press_enabled[button_index]
         print("Auto press key {}: {}".format(button_index + 1, "Enabled" if auto_press_enabled[button_index] else "Disabled"))
 
-        if auto_press_enabled[button_index]:
+        if auto_press_enabled[button_index]: 
             # 启动定时器
             timer_id = (button_index, "auto")  # 创建唯一的定时器 ID
             #print("on" ,button_index)
-            #timers[timer_id] = Timer(button_index + 1)  # 创建一个新的定时器，使用正整数 ID
-            timers[timer_id] = Timer(-1) 
+            timers[timer_id] = Timer(button_index + 1)  # 创建一个新的定时器，使用正整数 ID
+            #timers[timer_id] = Timer(-1) 
             timers[timer_id].init(period=macro.auto_interval, mode=Timer.PERIODIC, callback=lambda t: auto_key_press(button_index))
         else:
             # 停止定时器
@@ -388,7 +392,7 @@ def button_callback(pin):
     macro = button_macros[button_index]
 
     if current_state == 0 and button_states[button_index] == 1:
-        print("Press")
+        #print("Press")
         button_states[button_index] = 0
         # 按键按下
         
@@ -551,11 +555,13 @@ for pin in button_pins:
 
 #sleeptimer.init(mode=Timer.ONE_SHOT, period=DEEP_SLEEP_TIME * 1000, callback=go_to_deep_sleep)
 def stop_sleep_timer():
+    return
     global sleeptimer
     #print("sleep stop")
     sleeptimer.deinit()
     
 def reset_sleep_timer():
+    return
     global sleeptimer
     #print("sleep reset")
     sleeptimer.deinit()
@@ -567,5 +573,3 @@ while True:
     time.sleep(0.1)
 
 # 
-
-
