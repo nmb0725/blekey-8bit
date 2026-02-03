@@ -47,6 +47,25 @@ R_AUTO = KeyMacro(events=[
     KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x15)
 ], auto_interval=150, long_press=0, key=None, modifiers=0x00,button=None)
 
+#开关型 自动R
+R_LONG = KeyMacro(events=[
+    KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x15),
+    KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x15)
+], auto_interval=150, long_press=1, key=None, modifiers=0x00,button=None)
+
+#开关型 自动T
+T_AUTO = KeyMacro(events=[
+    KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x17),
+    KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x17)
+], auto_interval=300, long_press=0, key=None, modifiers=0x00,button=None)
+
+#开关型 自动T
+T_LONG = KeyMacro(events=[
+    KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x17),
+    KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x17)
+], auto_interval=300, long_press=1, key=None, modifiers=0x00,button=None)
+
+
 F12_AUTO = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x45),
     KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x45)
@@ -56,6 +75,7 @@ F11_AUTO = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x44),
     KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x44)
 ], auto_interval=50, long_press=1, key=None, modifiers=0x00,button=None)
+
 
 CTRL_1 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x1E, modifiers=0x01,button=None)
 CTRL_2 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x1F, modifiers=0x01,button=None)
@@ -122,23 +142,28 @@ UP = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x52, modifiers=0x00
 DOWN = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x51, modifiers=0x00,button=None) # CAPS 映射
 # 定义按键对应的宏
 #button_macros = [F12, MIDDLE_CLICK,CAPS, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
-button_macros = [F12_AUTO,F11_AUTO,CTRL_1,CTRL_4,CTRL_2,CTRL_3]
+button_macros = [F12_AUTO,F11_AUTO,R_AUTO,T_AUTO,R_LONG,CAPS,UP,LEFT,RIGHT,DOWN]
 
 # 定义按键输入引脚
 button_pins = [
     Pin(5, Pin.IN, Pin.PULL_UP),
     Pin(18, Pin.IN, Pin.PULL_UP),
-    Pin(25, Pin.IN, Pin.PULL_UP),#left
-    Pin(26, Pin.IN, Pin.PULL_UP),#down
+    Pin(26, Pin.IN, Pin.PULL_UP),#left
+    Pin(27, Pin.IN, Pin.PULL_UP),#down
     Pin(12, Pin.IN, Pin.PULL_UP),  #up
-    Pin(13, Pin.IN, Pin.PULL_UP) #right
-
+    Pin(13, Pin.IN, Pin.PULL_UP),#right
+    Pin(23, Pin.IN, Pin.PULL_UP),
+    Pin(22, Pin.IN, Pin.PULL_UP),
+    Pin(32, Pin.IN, Pin.PULL_UP),
+    Pin(33, Pin.IN, Pin.PULL_UP)
 ]
     
 #SET GND        
 Pin(19, Pin.OUT, 0)
 Pin(21, Pin.OUT, 0)
-Pin(27, Pin.OUT, 0) 
+Pin(25, Pin.OUT, 0)
+
+
 
 POWER_PIN = Pin(5, Pin.IN, Pin.PULL_UP)
 
