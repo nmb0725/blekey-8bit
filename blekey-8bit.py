@@ -14,8 +14,7 @@ MY_HID_NAME = 'ble_keyboard_mouse'
 led_pin = Pin(2, Pin.OUT)
 # 0x00: No modifier
 # 0x01: CTRL, 10 Rctrl
-#ctrl 左是04,需要附加, cap 是 39 ,tab 是 2B,SPACE是2C,ENTER是28 ,R是15,E是08,T是17,U是18+
-#2 1F  ,4 21
+#ctrl 左是04,需要附加, cap 是 39 ,tab 是 2B,SPACE是2C,ENTER是28 ,R是15,E是08,T是17,U是18
 # 自动按键状态
 # 0x00: No modifier
 # 0x01: CTRL (Left Control)
@@ -34,39 +33,20 @@ KeyMacro = namedtuple("KeyMacro", ["events", "auto_interval", "long_press", "key
 
 
 # 定义按键宏
-#auto_interval 是间隔时间自动执行, LONG_PRESS是做长按, 2个都加是键按住时触发
 LONG_PRESS_R = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x15),
     DelayEvent(delay=1000, action="delay"),
     KeyEvent(delay=0, action="release", modifier=0x00, keycode=0x15)
-], auto_interval=0, long_press=1, key=None, modifiers=0x00,button=None)
+], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
 
-#开关型 自动R
+CTRL_R = KeyMacro(events=[
+    KeyEvent(delay=0, action="press", modifier=0x10, keycode=0x00),
+], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
+
 R_AUTO = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x15),
     KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x15)
 ], auto_interval=150, long_press=0, key=None, modifiers=0x00,button=None)
-
-F12_AUTO = KeyMacro(events=[
-    KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x45),
-    KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x45)
-], auto_interval=50, long_press=1, key=None, modifiers=0x00,button=None)
-
-F11_AUTO = KeyMacro(events=[
-    KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x44),
-    KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x44)
-], auto_interval=50, long_press=1, key=None, modifiers=0x00,button=None)
-
-AUTO_2 = KeyMacro(events=[
-    KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x1F),
-    KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x1F)
-], auto_interval=50, long_press=1, key=None, modifiers=0x00,button=None)
-
-AUTO_4 = KeyMacro(events=[
-    KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x21),
-    KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x21)
-], auto_interval=50, long_press=1, key=None, modifiers=0x00,button=None)
-
 
 E = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x08),  # 按下 E 键，立即执行
@@ -107,37 +87,23 @@ MOUSE_MOVE_RIGHT = KeyMacro(events=[
 ], auto_interval=0, long_press=0, key=None, modifiers=0x00,button=None)
 
 CTRL = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x00, modifiers=0x01,button=None) # CTRL 映射
-F11 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x44, modifiers=0x00,button=None) # f11 映射
 F12 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x45, modifiers=0x00,button=None) # f12 映射
 TAB = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x2B, modifiers=0x00,button=None) # tab 映射
 CAPS = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x39, modifiers=0x00,button=None) # CAPS 映射
-LEFT = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x50, modifiers=0x00,button=None) # tab 映射
-RIGHT = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x4F, modifiers=0x00,button=None) # CAPS 映射
-UP = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x52, modifiers=0x00,button=None) # tab 映射
-DOWN = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x51, modifiers=0x00,button=None) # CAPS 映射
 # 定义按键对应的宏
-#button_macros = [F12, MIDDLE_CLICK,CAPS, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
-button_macros = [F12_AUTO,F11_AUTO,LEFT,AUTO_4,AUTO_2,RIGHT]
+button_macros = [F12, MIDDLE_CLICK,R_AUTO,CAPS, CTRL_R, CTRL_SHIFT_T, LEFT_CLICK, LEFT_CLICK_AUTO, WHEEL_UP, MOUSE_MOVE_RIGHT]
 
 # 定义按键输入引脚
 button_pins = [
-    Pin(5, Pin.IN, Pin.PULL_UP),
-    Pin(18, Pin.IN, Pin.PULL_UP),
-    Pin(25, Pin.IN, Pin.PULL_UP),#left
-    Pin(26, Pin.IN, Pin.PULL_UP),#down
-    Pin(12, Pin.IN, Pin.PULL_UP),  #up
-    Pin(13, Pin.IN, Pin.PULL_UP) #right
-
+    Pin(25, Pin.IN, Pin.PULL_UP),
+    Pin(26, Pin.IN, Pin.PULL_UP),
+    Pin(27, Pin.IN, Pin.PULL_UP),
+    Pin(14, Pin.IN, Pin.PULL_UP)
 ]
-    
-#SET GND        
-Pin(19, Pin.OUT, 0)
-Pin(21, Pin.OUT, 0)
-Pin(27, Pin.OUT, 0) 
 
-POWER_PIN = Pin(5, Pin.IN, Pin.PULL_UP)
+POWER_PIN = Pin(26, Pin.IN, Pin.PULL_UP)
 
-DEEP_SLEEP_TIME = 7200
+DEEP_SLEEP_TIME = 3600
 # 秒
 
 # 设置超时时间（秒）
@@ -161,7 +127,7 @@ debounce_delay = 0
 # 定时器列表
 timers = {}
 
-sleeptimer = Timer(-1)
+sleeptimer = Timer(0)
 
 # 定义定时器中断处理函数，进入深度睡眠模式
 def go_to_deep_sleep(timer):
@@ -230,16 +196,13 @@ def handle_button_press(button_index):
         auto_press_enabled[button_index] = not auto_press_enabled[button_index]
         print("Auto press key {}: {}".format(button_index + 1, "Enabled" if auto_press_enabled[button_index] else "Disabled"))
 
-        if auto_press_enabled[button_index]: 
+        if auto_press_enabled[button_index]:
             # 启动定时器
             timer_id = (button_index, "auto")  # 创建唯一的定时器 ID
-            #print("on" ,button_index)
             timers[timer_id] = Timer(button_index + 1)  # 创建一个新的定时器，使用正整数 ID
-            #timers[timer_id] = Timer(-1) 
             timers[timer_id].init(period=macro.auto_interval, mode=Timer.PERIODIC, callback=lambda t: auto_key_press(button_index))
         else:
             # 停止定时器
-           # print("off" ,button_index)
             timer_id = (button_index, "auto")
             if timer_id in timers:
                 timers[timer_id].deinit()
@@ -321,7 +284,9 @@ def delayed_action(button_index, event_index, timer_id):
 
 def auto_key_press(button_index):
     global button_macros, ble_hid, last_press_time
+
     macro = button_macros[button_index]
+
     # 遍历按键事件
     for i, event in enumerate(macro.events):
         if isinstance(event, KeyEvent):
@@ -396,7 +361,7 @@ def button_callback(pin):
         button_states[button_index] = 0
         # 按键按下
         
-        print("Press key {}: {}".format(button_index + 1,""))
+        #print("Press key {}: {}".format(button_index + 1,""))
 
         if macro.key is not None:  # 如果定义了要模拟的键
             ble_hid.key_press(special=macro.modifiers, general=macro.key)  # 模拟组合键按下
@@ -410,7 +375,7 @@ def button_callback(pin):
     elif current_state == 1 and button_states[button_index] == 0:
         button_states[button_index] = 1
         # 按键松开
-        print("Release key {}: {}".format(button_index + 1, ""))
+        #print("Release key {}: {}".format(button_index + 1, ""))
         
         if macro.key is not None:  # 如果定义了要模拟的键
             ble_hid.key_release(special=macro.modifiers, general=macro.key)  # 模拟组合键松开
@@ -418,9 +383,6 @@ def button_callback(pin):
             # 执行鼠标按键操作
             #print("mouse release" )
             ble_hid.mouse_release(get_mouse_button_code(macro.button))
-        elif macro.auto_interval > 0  and macro.long_press == 1:
-            handle_button_press(button_index)  # 处理其他按键事件
-            
         # 停止长按
         long_press_enabled[button_index] = False
         ble_hid.release_all_keys()
@@ -555,13 +517,11 @@ for pin in button_pins:
 
 #sleeptimer.init(mode=Timer.ONE_SHOT, period=DEEP_SLEEP_TIME * 1000, callback=go_to_deep_sleep)
 def stop_sleep_timer():
-    return
     global sleeptimer
     #print("sleep stop")
     sleeptimer.deinit()
     
 def reset_sleep_timer():
-    return
     global sleeptimer
     #print("sleep reset")
     sleeptimer.deinit()
@@ -572,4 +532,3 @@ reset_sleep_timer()
 while True:
     time.sleep(0.1)
 
-# 

@@ -310,7 +310,7 @@ MOUSE_MOVE_RIGHT = KeyMacro(events=[
 CTRL = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x00, modifiers=0x01,button=None, cancel=1) # CTRL 映射
 
 # 按键与宏绑定列表
-button_macros = [F12_AUTO, F11_AUTO, T_AUTO, R_AUTO, KEY_6, LONG_SHIFT_T, UP, LEFT, RIGHT, DOWN]
+button_macros = [MOUSE_WIGGLE, F11_AUTO, T_AUTO, R_AUTO, KEY_6, LONG_SHIFT_T, UP, LEFT, RIGHT, DOWN]
 
 # 定义按键输入引脚
 button_pins = [
@@ -451,4 +451,3 @@ try:
     asyncio.run(main())
 except KeyboardInterrupt:
     pass
-
