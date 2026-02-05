@@ -214,11 +214,11 @@ LONG_SHIFT_T = KeyMacro(
     events=[
         KeyEvent(delay=0, action="press", modifier=0x02, keycode=0x00), 
         KeyEvent(delay=30, action="release", modifier=0x02, keycode=0x00),
-        DelayEvent(delay=200, action="delay"),
+        DelayEvent(delay=250, action="delay"),
         KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x17), 
         KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x17)
     ],
-    auto_interval=50, long_press=1, key=None, modifiers=0, button=None, cancel=0
+    auto_interval=150, long_press=1, key=None, modifiers=0, button=None, cancel=0
 )
 
 UP    = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x52, modifiers=0, button=None, cancel=1)
