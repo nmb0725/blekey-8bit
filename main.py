@@ -214,7 +214,7 @@ LONG_SHIFT_T = KeyMacro(
     events=[
         KeyEvent(delay=0, action="press", modifier=0x02, keycode=0x00), 
         KeyEvent(delay=30, action="release", modifier=0x02, keycode=0x00),
-        DelayEvent(delay=250, action="delay"),
+        DelayEvent(delay=200, action="delay"),
         KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x17), 
         KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x17)
     ],
@@ -269,11 +269,12 @@ AUTO_4 = KeyMacro(events=[
     KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x21)
 ], auto_interval=50, long_press=1, key=None, modifiers=0x00,button=None, cancel=1) 
 
-E = KeyMacro(events=[
-    KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x08),  # 按下 E 键，立即执行
-    DelayEvent(delay=0, action="delay"),
-    KeyEvent(delay=0, action="release", modifier=0x00, keycode=0x08)  # 释放 E 键，立即执行
-], auto_interval=0, long_press=1, key=None, modifiers=0x00,button=None, cancel=1) 
+AUTO_CAPS_E = KeyMacro(events=[
+    KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x39),  # 按下 E 键，立即执行
+    KeyEvent(delay=30, action="press", modifier=0x00, keycode=0x08),  # 按下 E 键，立即执行
+    KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x08),  # 释放 E 键，立即执行
+    KeyEvent(delay=0, action="release", modifier=0x00, keycode=0x39),  # 按下 E 键，立即执行
+], auto_interval=50, long_press=1, key=None, modifiers=0x00,button=None, cancel=0) 
 
 CTRL_SHIFT_T = KeyMacro(events=[
     KeyEvent(delay=0, action="press", modifier=0x03, keycode=0x17),
@@ -309,8 +310,19 @@ MOUSE_MOVE_RIGHT = KeyMacro(events=[
 
 CTRL = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x00, modifiers=0x01,button=None, cancel=1) # CTRL 映射
 
+
+# 修改后的开关 W 宏
+W_SWITCH = KeyMacro(
+    events=[KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x1A)], 
+    auto_interval=1000, # 必须大于0才能触发扫描器的“切换”逻辑
+    long_press=0, 
+    key=None, 
+    modifiers=0x00, 
+    button=None, 
+    cancel=1
+)
 # 按键与宏绑定列表
-button_macros = [F12_AUTO, F11_AUTO, T_AUTO, R_AUTO, KEY_6, LONG_SHIFT_T, UP, LEFT, RIGHT, DOWN]
+button_macros = [F12_AUTO, F11_AUTO, T_AUTO, R_AUTO, W_SWITCH, LONG_SHIFT_T, UP, LEFT, RIGHT, DOWN]
 
 # 定义按键输入引脚
 button_pins = [
