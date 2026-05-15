@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'>
+<title>BLEKey Config</title>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<style>
+*{box-sizing:border-box}
+body{font-family:sans-serif;padding:16px;background:#111;color:#eee;max-width:600px;margin:0 auto}
+h1{color:#58a6ff;font-size:20px;margin:0 0 16px}
+h2{color:#58a6ff;font-size:15px;margin:16px 0 8px;border-bottom:1px solid #333;padding-bottom:4px}
+label{display:block;font-size:12px;color:#888;margin:6px 0 2px}
+.row{display:flex;gap:6px;margin:4px 0;align-items:center}
+.row input,.row select{padding:5px;background:#222;border:1px solid #333;color:#eee;border-radius:3px}
+.row input[type=number]{width:64px}
+.row select{flex:1}
+.row .edit-btn{padding:4px 8px;background:#222;border:1px solid #333;color:#58a6ff;border-radius:3px;cursor:pointer;font-size:14px;text-decoration:none;line-height:1}
+.row .edit-btn:hover{background:#333}
+input[type=text],input[type=number],input[type=password]{width:100%;padding:5px;background:#222;border:1px solid #333;color:#eee;border-radius:3px}
+.pw-wrap{display:flex;gap:4px;align-items:center}
+.pw-wrap input{flex:1}
+.pw-toggle{padding:4px 8px;background:#222;border:1px solid #333;color:#888;border-radius:3px;cursor:pointer;font-size:13px;white-space:nowrap}
+.pw-toggle:hover{background:#333;color:#eee}
+.actions{margin-top:16px;display:flex;gap:8px}
+.btn{padding:8px 20px;border:none;border-radius:4px;cursor:pointer;font-size:14px}
+.btn:hover{opacity:0.9}
+.btn-save{background:#238636;color:#fff}
+.btn-save:hover{background:#2ea043}
+.btn-reboot{background:#d32f2f;color:#fff}
+.btn-reboot:hover{background:#f44336}
+#msg{padding:8px;margin:8px 0;border-radius:4px;display:none;font-size:13px}
+#msg.ok{display:block;background:#23863633;border:1px solid #238636;color:#3fb950}
+#msg.err{display:block;background:#d32f2f33;border:1px solid #d32f2f;color:#ff5252}
+</style>
+</head>
+<body>
+<h1>BLEKey-8bit Config</h1>
+<p id="ip" style="color:#888;font-size:13px">IP: --</p>
+<div id='msg'></div>
+<h2>Buttons</h2>
+<div id='btns'></div>
+<h2>System</h2>
+<label>Trigger Pins (comma separated)</label>
+<input id='trigger' type='text' placeholder='e.g. 0,1'>
+<label>Long Press (ms)</label>
+<input id='longpress' type='number' placeholder='3000'>
+<label>Web Host</label>
+<input id='webhost' type='text' placeholder='0.0.0.0'>
+<label>Web Port</label>
+<input id='webport' type='number' placeholder='80'>
+<h2>WiFi</h2>
+<label>WiFi SSID</label>
+<input id='wifissid' type='text' placeholder='e.g. MyWiFi'>
+<label>WiFi Password</label>
+<div class="pw-wrap">
+<input id='wifipw' type='password' placeholder='e.g. password'>
+<button class="pw-toggle" onclick="togglePw()" id="pwbtn">Show</button>
+</div>
+<div class='actions'>
+<button class='btn btn-save' onclick='save()'>Save</button>
+<button class='btn btn-reboot' onclick='reboot()'>Save &amp; Reboot</button>
+</div>
+<script>
+var M=[];
+fetch('/api/settings').then(function(r){return r.json()}).then(function(d){
+  document.getElementById('ip').textContent='IP: '+(d.ip||'--');
+});
+fetch('/api/macros').then(function(r){return r.json()}).then(function(d){M=d.macros;load()});
+function load(){
+  fetch('/api/settings').then(function(r){return r.json()}).then(function(d){
+    var s=d.settings,h='';
+    s.button_configs.forEach(function(c,i){
+      h+='<div class="row"><input id="p'+i+'" type="number" value="'+c.pin+'"><select id="m'+i+'">';
+      M.forEach(function(n){h+='<option'+(n==c.macro?' selected':'')+'>'+n+'</option>'});
+      h+='</select><a class="edit-btn" href="/editor?index='+i+'">✎</a></div>';
+    });
+    document.getElementById('btns').innerHTML=h;
+    document.getElementById('trigger').value=s.trigger_pins.join(',');
+    document.getElementById('longpress').value=s.long_press_ms;
+    document.getElementById('webhost').value=s.web_host||'0.0.0.0';
+    document.getElementById('webport').value=s.web_port||80;
+    document.getElementById('wifissid').value=s.wifi_ssid||'';
+    document.getElementById('wifipw').value=s.wifi_password||'';
+  });
+}
+function getCfg(){
+  var a=[],n=document.querySelectorAll('#btns .row').length;
+  for(var i=0;i<n;i++){
+    a.push({pin:+document.getElementById('p'+i).value,macro:document.getElementById('m'+i).value,custom_events:null})
+  }
+  return{button_configs:a,trigger_pins:document.getElementById('trigger').value.split(',').map(function(x){return +x.trim()}),long_press_ms:+document.getElementById('longpress').value,web_host:document.getElementById('webhost').value,web_port:+document.getElementById('webport').value,wifi_ssid:document.getElementById('wifissid').value,wifi_password:document.getElementById('wifipw').value}
+}
+function msg(t,c){var e=document.getElementById('msg');e.className=c;e.textContent=t}
+function togglePw(){
+  var pw=document.getElementById('wifipw');
+  var btn=document.getElementById('pwbtn');
+  if(pw.type=='password'){
+    pw.type='text';
+    btn.textContent='Hide';
+  }else{
+    pw.type='password';
+    btn.textContent='Show';
+  }
+}
+function save(){
+  var d=getCfg();
+  fetch('/api/settings',{method:'POST',body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){msg('Saved OK','ok')}).catch(function(e){msg('Error: '+e,'err')})
+}
+function reboot(){
+  var d=getCfg();
+  fetch('/api/settings',{method:'POST',body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){fetch('/api/reboot',{method:'POST'})}).catch(function(e){msg('Error: '+e,'err')})
+}
+</script>
+</body>
+</html>

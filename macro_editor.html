@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'>
+<title>Macro Editor</title>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<style>
+*{box-sizing:border-box}
+body{font-family:sans-serif;padding:16px;background:#111;color:#eee;max-width:600px;margin:0 auto}
+h1{color:#58a6ff;font-size:20px;margin:0 0 8px}
+h2{color:#58a6ff;font-size:15px;margin:16px 0 8px;border-bottom:1px solid #333;padding-bottom:4px}
+label{display:block;font-size:12px;color:#888;margin:6px 0 2px}
+input[type=text],input[type=number]{padding:5px;background:#222;border:1px solid #333;color:#eee;border-radius:3px}
+.event-row{display:flex;gap:4px;margin:4px 0;align-items:center;flex-wrap:wrap;padding:6px;background:#1a1a1a;border-radius:4px}
+.event-row select,.event-row input{padding:4px;background:#222;border:1px solid #333;color:#eee;border-radius:3px;font-size:12px}
+.event-row .evt-type{width:70px}
+.event-row .evt-delay{width:60px}
+.event-row .evt-action{width:70px}
+.event-row .evt-mod-select{width:100px}
+.event-row .evt-mod-hidden{width:55px}
+.event-row .evt-key-select{width:80px}
+.event-row .evt-key-hidden{width:55px}
+.event-row .evt-key{width:55px}
+.event-row .evt-button{width:75px}
+.event-row .evt-x,.event-row .evt-y,.event-row .evt-delta{width:55px}
+.event-row .evt-del{padding:4px 8px;background:#d32f2f33;border:1px solid #d32f2f;color:#ff5252;border-radius:3px;cursor:pointer;font-size:14px}
+.event-row .evt-del:hover{background:#d32f2f66}
+.evt-params{display:inline-flex;gap:4px;align-items:center}
+.actions{margin-top:16px;display:flex;gap:8px}
+.btn{padding:8px 20px;border:none;border-radius:4px;cursor:pointer;font-size:14px}
+.btn:hover{opacity:0.9}
+.btn-save{background:#238636;color:#fff}
+.btn-save:hover{background:#2ea043}
+.btn-back{background:#333;color:#eee}
+.btn-back:hover{background:#444}
+.btn-add{background:#1a5fb4;color:#fff;margin-top:8px}
+.btn-add:hover{background:#2a7fd4}
+.setting-row{display:flex;align-items:center;gap:8px;margin:4px 0}
+.setting-row input[type=number]{width:120px}
+.setting-row input[type=checkbox]{width:18px;height:18px}
+#msg{padding:8px;margin:8px 0;border-radius:4px;display:none;font-size:13px}
+#msg.ok{display:block;background:#23863633;border:1px solid #238636;color:#3fb950}
+#msg.err{display:block;background:#d32f2f33;border:1px solid #d32f2f;color:#ff5252}
+#btn-info{color:#888;font-size:13px}
+</style>
+</head>
+<body>
+<h1>Macro Editor</h1>
+<p id="btn-info">Button #<span id="btn-index">-</span> (Pin <span id="btn-pin">-</span>)</p>
+<div id='msg'></div>
+<h2>Events</h2>
+<div id='events'></div>
+<button class='btn btn-add' onclick='addEvent()'>+ Add Event</button>
+<h2>Macro Settings</h2>
+<label>Auto Interval (ms, 0 = off)</label>
+<input id='auto_interval' type='number' value='0'>
+<div class='setting-row'>
+  <input id='long_press' type='checkbox'>
+  <label style='margin:0'>Long Press Mode</label>
+</div>
+<div class='setting-row'>
+  <input id='cancel' type='checkbox' checked>
+  <label style='margin:0'>Cancel on Release</label>
+</div>
+<div class='actions'>
+<button class='btn btn-save' onclick='saveMacro()'>Save</button>
+<button class='btn btn-back' onclick="location.href='/'">Back</button>
+</div>
+<script>
+var idx=new URLSearchParams(location.search).get('index');
+document.getElementById('btn-index').textContent=idx;
+var ET=0;
+var KEYCODES=[
+  {l:'A',v:0x04},{l:'B',v:0x05},{l:'C',v:0x06},{l:'D',v:0x07},
+  {l:'E',v:0x08},{l:'F',v:0x09},{l:'G',v:0x0A},{l:'H',v:0x0B},
+  {l:'I',v:0x0C},{l:'J',v:0x0D},{l:'K',v:0x0E},{l:'L',v:0x0F},
+  {l:'M',v:0x10},{l:'N',v:0x11},{l:'O',v:0x12},{l:'P',v:0x13},
+  {l:'Q',v:0x14},{l:'R',v:0x15},{l:'S',v:0x16},{l:'T',v:0x17},
+  {l:'U',v:0x18},{l:'V',v:0x19},{l:'W',v:0x1A},{l:'X',v:0x1B},
+  {l:'Y',v:0x1C},{l:'Z',v:0x1D},
+  {l:'1',v:0x1E},{l:'2',v:0x1F},{l:'3',v:0x20},{l:'4',v:0x21},
+  {l:'5',v:0x22},{l:'6',v:0x23},{l:'7',v:0x24},{l:'8',v:0x25},
+  {l:'9',v:0x26},{l:'0',v:0x27},
+  {l:'-',v:0x2D},{l:'=',v:0x2E},{l:'[',v:0x2F},{l:']',v:0x30},
+  {l:'\\',v:0x31},{l:';',v:0x33},{l:'\'',v:0x34},{l:'`',v:0x35},
+  {l:',',v:0x36},{l:'.',v:0x37},{l:'/',v:0x38},
+  {l:'Enter',v:0x28},{l:'Escape',v:0x29},{l:'Backspace',v:0x2A},
+  {l:'Tab',v:0x2B},{l:'Space',v:0x2C},{l:'Caps Lock',v:0x39},
+  {l:'F1',v:0x3A},{l:'F2',v:0x3B},{l:'F3',v:0x3C},{l:'F4',v:0x3D},
+  {l:'F5',v:0x3E},{l:'F6',v:0x3F},{l:'F7',v:0x40},{l:'F8',v:0x41},
+  {l:'F9',v:0x42},{l:'F10',v:0x43},{l:'F11',v:0x44},{l:'F12',v:0x45},
+  {l:'Print Screen',v:0x46},{l:'Scroll Lock',v:0x47},{l:'Pause',v:0x48},
+  {l:'Insert',v:0x49},{l:'Home',v:0x4A},{l:'Page Up',v:0x4B},
+  {l:'Delete',v:0x4C},{l:'End',v:0x4D},{l:'Page Down',v:0x4E},
+  {l:'→',v:0x4F},{l:'←',v:0x50},{l:'↓',v:0x51},{l:'↑',v:0x52},
+  {l:'Ctrl',v:0xE0},{l:'Shift',v:0xE1},{l:'Alt',v:0xE2},{l:'Win',v:0xE3}
+];
+var MODIFIERS=[
+  {l:'None',v:0},{l:'Ctrl',v:1},{l:'Shift',v:2},{l:'Alt',v:4},{l:'Win',v:8},
+  {l:'Ctrl+Shift',v:3},{l:'Ctrl+Alt',v:5},{l:'Shift+Alt',v:6},
+  {l:'Ctrl+Shift+Alt',v:7},{l:'Ctrl+Shift+Alt+Win',v:15}
+];
+fetch('/api/settings').then(function(r){return r.json()}).then(function(d){
+  var s=d.settings;
+  var btn=s.button_configs[idx];
+  document.getElementById('btn-pin').textContent=btn.pin;
+  if(btn.custom_events&&btn.custom_events.custom_events){
+    loadMacro(btn.custom_events);
+  }else if(btn.macro&&btn.macro!=='DISABLED'){
+    fetch('/api/macro/'+btn.macro).then(function(r){return r.json()}).then(function(m){loadMacro(m)});
+  }
+});
+function loadMacro(m){
+  if(!m) return;
+  document.getElementById('auto_interval').value=m.auto_interval||0;
+  document.getElementById('long_press').checked=!!m.long_press;
+  document.getElementById('cancel').checked=!!m.cancel;
+  if(m.custom_events){
+    m.custom_events.forEach(function(e){addEvent(e)});
+  }
+}
+function addEvent(evt){
+  evt=evt||{type:'key',delay:0,action:'press',modifier:0,keycode:0};
+  var id='evt_'+(ET++);
+  var div=document.createElement('div');
+  div.className='event-row';
+  div.id=id;
+  var html='<select class="evt-type" onchange="onTypeChange(\''+id+'\')">';
+  ['key','mouse','move','wheel','delay'].forEach(function(t){
+    html+='<option'+(t==evt.type?' selected':'')+'>'+t+'</option>';
+  });
+  html+='</select>';
+  html+='<input class="evt-delay" type="number" value="'+evt.delay+'" placeholder="ms">';
+  html+='<span class="evt-params" id="params_'+id+'"></span>';
+  html+='<button class="evt-del" onclick="delEvent(\''+id+'\')">×</button>';
+  div.innerHTML=html;
+  document.getElementById('events').appendChild(div);
+  updateParams(id,evt);
+}
+function updateParams(id,evt){
+  var params=document.getElementById('params_'+id);
+  var type=document.getElementById(id).querySelector('.evt-type').value;
+  var html='';
+  if(type=='key'){
+    html+='<select class="evt-action">';
+    ['press','release'].forEach(function(a){html+='<option'+(a==(evt.action||'press')?' selected':'')+'>'+a+'</option>'});
+    html+='</select>';
+    html+='<select class="evt-mod-select" onchange="onModSelect(this)">';
+    var mv=evt.modifier||0,mfound=false;
+    MODIFIERS.forEach(function(m){
+      var sel=(m.v==mv?' selected':'');
+      if(sel)mfound=true;
+      html+='<option value="'+m.v+'"'+sel+'>'+m.l+'</option>';
+    });
+    html+='<option value="-1"'+(mfound?'':' selected')+'>0x...</option>';
+    html+='</select>';
+    html+='<input class="evt-mod-hidden" type="text" value="0x'+(mv.toString(16).padStart(2,'0'))+'" placeholder="0x.."'+(mfound?' style="display:none"':'')+'>';
+    html+='<select class="evt-key-select" onchange="onKeySelect(this)">';
+    var kc=evt.keycode||0,kfound=false;
+    KEYCODES.forEach(function(k){
+      var sel=(k.v==kc?' selected':'');
+      if(sel)kfound=true;
+      html+='<option value="'+k.v+'"'+sel+'>'+k.l+'</option>';
+    });
+    html+='<option value="-1"'+(kfound?'':' selected')+'>0x...</option>';
+    html+='</select>';
+    html+='<input class="evt-key-hidden" type="text" value="0x'+(kc.toString(16).padStart(2,'0'))+'" placeholder="0x.."'+(kfound?' style="display:none"':'')+'>';
+  }else if(type=='mouse'){
+    html+='<select class="evt-action">';
+    ['press','release'].forEach(function(a){html+='<option'+(a==(evt.action||'press')?' selected':'')+'>'+a+'</option>'});
+    html+='</select>';
+    html+='<select class="evt-button">';
+    ['left','right','middle'].forEach(function(b){html+='<option'+(b==(evt.button||'left')?' selected':'')+'>'+b+'</option>'});
+    html+='</select>';
+  }else if(type=='move'){
+    html+='<input class="evt-x" type="number" value="'+(evt.x||0)+'" placeholder="x">';
+    html+='<input class="evt-y" type="number" value="'+(evt.y||0)+'" placeholder="y">';
+  }else if(type=='wheel'){
+    html+='<input class="evt-delta" type="number" value="'+(evt.delta||120)+'" placeholder="delta">';
+  }
+  params.innerHTML=html;
+}
+function onTypeChange(id){
+  updateParams(id,{});
+}
+function onKeySelect(sel){
+  var input=sel.parentNode.querySelector('.evt-key-hidden');
+  if(sel.value=='-1'){
+    input.style.display='';
+  }else{
+    input.style.display='none';
+    input.value='0x'+(+sel.value).toString(16).padStart(2,'0');
+  }
+}
+function onModSelect(sel){
+  var input=sel.parentNode.querySelector('.evt-mod-hidden');
+  if(sel.value=='-1'){
+    input.style.display='';
+  }else{
+    input.style.display='none';
+    input.value='0x'+(+sel.value).toString(16).padStart(2,'0');
+  }
+}
+function delEvent(id){
+  document.getElementById(id).remove();
+}
+function saveMacro(){
+  var events=[];
+  document.querySelectorAll('.event-row').forEach(function(row){
+    var type=row.querySelector('.evt-type').value;
+    var delay=+row.querySelector('.evt-delay').value||0;
+    var e={type:type,delay:delay};
+    if(type=='key'){
+      e.action=row.querySelector('.evt-action').value;
+      var modSel=row.querySelector('.evt-mod-select');
+      if(modSel.value=='-1'){
+        e.modifier=parseInt(row.querySelector('.evt-mod-hidden').value,16)||0;
+      }else{
+        e.modifier=+modSel.value;
+      }
+      var keySel=row.querySelector('.evt-key-select');
+      if(keySel.value=='-1'){
+        e.keycode=parseInt(row.querySelector('.evt-key-hidden').value,16)||0;
+      }else{
+        e.keycode=+keySel.value;
+      }
+    }else if(type=='mouse'){
+      e.action=row.querySelector('.evt-action').value;
+      e.button=row.querySelector('.evt-button').value;
+    }else if(type=='move'){
+      e.x=+row.querySelector('.evt-x').value||0;
+      e.y=+row.querySelector('.evt-y').value||0;
+    }else if(type=='wheel'){
+      e.delta=+row.querySelector('.evt-delta').value||0;
+    }
+    events.push(e);
+  });
+  var customData={
+    custom_events:events,
+    auto_interval:+document.getElementById('auto_interval').value||0,
+    long_press:document.getElementById('long_press').checked?1:0,
+    cancel:document.getElementById('cancel').checked?1:0
+  };
+  fetch('/api/settings').then(function(r){return r.json()}).then(function(d){
+    var s=d.settings;
+    s.button_configs[idx].macro='CUSTOM';
+    s.button_configs[idx].custom_events=customData;
+    fetch('/api/settings',{method:'POST',body:JSON.stringify(s)}).then(function(r){return r.json()}).then(function(d){msg('Saved OK','ok')}).catch(function(e){msg('Error: '+e,'err')});
+  });
+}
+function msg(t,c){var e=document.getElementById('msg');e.className=c;e.textContent=t}
+</script>
+</body>
+</html>
