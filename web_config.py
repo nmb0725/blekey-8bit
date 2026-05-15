@@ -2,7 +2,8 @@ import socket
 import ujson
 import machine
 import asyncio
-from settings import load_settings, save_settings, get_macro_names, get_macro_registry, custom_macro_to_dict, parse_custom_macro
+from macros import get_macro_names, get_macro_registry, custom_macro_to_dict
+from settings import load_settings, save_settings
 
 SERVER_RUNNING = True
 
@@ -13,20 +14,20 @@ def _send_headers(conn, status, content_type):
     response += "\r\n"
     try:
         conn.send(response.encode("utf-8"))
-    except:
-        pass
+    except OSError as e:
+        print("HTTP header send failed:", e)
 
 def _send(conn, text):
     try:
         conn.send(text.encode("utf-8"))
-    except:
-        pass
+    except OSError as e:
+        print("HTTP body send failed:", e)
 
 def _close(conn):
     try:
         conn.close()
-    except:
-        pass
+    except OSError as e:
+        print("HTTP close failed:", e)
 
 def _send_json(conn, data):
     body = ujson.dumps(data)
@@ -59,8 +60,8 @@ def _get_ip():
         wlan = network.WLAN(network.STA_IF)
         if wlan.isconnected():
             return wlan.ifconfig()[0]
-    except:
-        pass
+    except Exception as e:
+        print("Unable to read WiFi IP:", e)
     return "0.0.0.0"
 
 def _parse_request(conn):
@@ -99,7 +100,8 @@ def _parse_request(conn):
                     break
                 body += chunk.decode("utf-8")
         return method, path, body, conn
-    except:
+    except Exception as e:
+        print("Invalid HTTP request:", e)
         return None, None, None, conn
 
 def _handle_api_settings(conn, method, body):
@@ -139,6 +141,7 @@ def _handle_request(conn):
     try:
         method, path, body, conn = _parse_request(conn)
         if method is None:
+            _close(conn)
             return
         if path == "/" and method == "GET":
             _send_file(conn, "web_config.html")
@@ -158,8 +161,8 @@ def _handle_request(conn):
     except Exception as e:
         try:
             _send_error(conn, 500, "Server Error: " + str(e))
-        except:
-            pass
+        except Exception as send_error:
+            print("Unable to send server error response:", send_error)
 
 async def run_web_server():
     global SERVER_RUNNING
@@ -188,8 +191,8 @@ async def run_web_server():
         if s:
             try:
                 s.close()
-            except:
-                pass
+            except OSError as e:
+                print("Web server socket close failed:", e)
 
 def start_web_server():
     return asyncio.create_task(run_web_server())

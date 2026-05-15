@@ -6,11 +6,12 @@ import bluetooth
 import struct
 import gc
 from ble_hid import HID
-from settings import (
-    KeyEvent, MouseEvent, MouseMoveEvent, WheelEvent, DelayEvent, KeyMacro,
-    load_settings, get_macro_registry, parse_custom_macro
+from macros import (
+    KeyEvent, MouseEvent, MouseMoveEvent, WheelEvent,
+    get_macro_registry, parse_custom_macro
 )
-from wifi_manager import connect_wifi, disconnect_wifi
+from settings import load_settings
+from wifi_manager import connect_wifi
 from web_config import start_web_server, stop_web_server
 
 freq(160000000)
@@ -50,7 +51,7 @@ def _build_config():
 
 button_pins, button_macros = _build_config()
 
-trigger_indices = SETTINGS.get("trigger_pins", [0, 9])
+trigger_indices = SETTINGS.get("trigger_pins", [0, 1])
 long_press_ms = SETTINGS.get("long_press_ms", 3000)
 
 class MyHID(HID):
@@ -60,8 +61,8 @@ class MyHID(HID):
         super().__init__(name)
         try:
             self._ble.config(bond=True, le_sec=True, io=0)
-        except:
-            pass
+        except Exception as e:
+            print("BLE security config unavailable:", e)
         self._ble.irq(self._custom_irq)
         self.start_advertising(name)
 
@@ -69,8 +70,11 @@ class MyHID(HID):
         try:
             import ble_hid_key
             self.secrets = ble_hid_key.keys
-        except:
-            pass
+        except ImportError:
+            self.secrets = {}
+        except Exception as e:
+            print("Unable to load BLE bonding keys:", e)
+            self.secrets = {}
 
     def start_advertising(self, name):
         payload = bytearray(b'\x02\x01\x06')
@@ -92,8 +96,8 @@ class MyHID(HID):
             try:
                 with open("ble_hid_key.py", "w") as f:
                     f.write("keys = " + repr(self.secrets))
-            except:
-                pass
+            except OSError as e:
+                print("Unable to save BLE bonding keys:", e)
             return True
         elif event == _IRQ_CENTRAL_CONNECT:
             self.conn_handle = data[0]
@@ -118,8 +122,8 @@ class MyHID(HID):
                 self._ble.gatts_notify(self.conn_handle, self.k_rep, buf)
                 if not pressed and mod != 0:
                     self._ble.gatts_notify(self.conn_handle, self.k_rep, b'\x00\x00\x00\x00\x00\x00\x00\x00')
-            except:
-                pass
+            except Exception as e:
+                print("Keyboard notify failed:", e)
 
     def send_mouse(self, buttons=0, x=0, y=0, wheel=0):
         if self.is_connected():
@@ -129,8 +133,8 @@ class MyHID(HID):
             buf = struct.pack('bbbb', buttons, x, y, wheel)
             try:
                 self._ble.gatts_notify(self.conn_handle, self.m_rep, buf)
-            except:
-                pass
+            except Exception as e:
+                print("Mouse notify failed:", e)
 
     def release_all(self):
         if self.is_connected():
@@ -139,8 +143,8 @@ class MyHID(HID):
                 self.send_mouse(0, 0, 0, 0)
                 time.sleep_ms(5)
                 self._ble.gatts_notify(self.conn_handle, self.k_rep, b'\x00\x00\x00\x00\x00\x00\x00\x00')
-            except:
-                pass
+            except Exception as e:
+                print("Release all failed:", e)
 
 ble_hid = MyHID(MY_HID_NAME)
 
@@ -149,11 +153,14 @@ active_tasks = [None] * len(button_pins)
 prev_state = [1] * len(button_pins)
 
 config_mode_trigger = False
-trigger_press_start = [0, 0]
+trigger_press_start = [0] * len(trigger_indices)
 
-async def run_events_async(macro, idx):
+async def run_events_async(macro, idx, cancellable=False):
     for event in macro.events:
-        if macro.cancel == 1 and not auto_enabled[idx]:
+        # Only long/auto-running macros should stop on release. One-shot event
+        # macros are scheduled while auto_enabled is false, so checking cancel
+        # unconditionally makes them no-op.
+        if cancellable and macro.cancel == 1 and not auto_enabled[idx]:
             break
         if isinstance(event, KeyEvent):
             ble_hid.send_raw(event.modifier, event.keycode, (event.action == "press"))
@@ -178,7 +185,7 @@ async def auto_loop_task(idx):
     macro = button_macros[idx]
     try:
         while auto_enabled[idx]:
-            await run_events_async(macro, idx)
+            await run_events_async(macro, idx, cancellable=True)
             if macro.auto_interval > 0:
                 await asyncio.sleep_ms(macro.auto_interval)
             else:
@@ -188,7 +195,7 @@ async def auto_loop_task(idx):
         active_tasks[idx] = None
 
 async def wait_for_exit_trigger():
-    press_start = [0, 0]
+    press_start = [0] * len(trigger_indices)
     while True:
         for i, idx in enumerate(trigger_indices):
             if 0 <= idx < len(button_pins):
@@ -253,8 +260,7 @@ async def button_scanner():
         if trigger_held:
             if trigger_press_start[0] == 0:
                 now = time.ticks_ms()
-                trigger_press_start[0] = now
-                trigger_press_start[1] = now
+                trigger_press_start = [now] * len(trigger_indices)
             elapsed = time.ticks_diff(time.ticks_ms(), trigger_press_start[0])
             if elapsed >= long_press_ms:
                 for i in range(len(button_pins)):
@@ -263,11 +269,11 @@ async def button_scanner():
                         active_tasks[i].cancel()
                         active_tasks[i] = None
                 ble_hid.release_all()
-                trigger_press_start = [0, 0]
+                trigger_press_start = [0] * len(trigger_indices)
                 await config_mode()
                 continue
         else:
-            trigger_press_start = [0, 0]
+            trigger_press_start = [0] * len(trigger_indices)
 
         for i, pin in enumerate(button_pins):
             if trigger_held and i in trigger_indices:
@@ -302,7 +308,7 @@ async def button_scanner():
                             btn_val = 1 if macro.button == "left" else 2 if macro.button == "right" else 4
                             ble_hid.send_mouse(buttons=btn_val)
                         else:
-                            asyncio.create_task(run_events_async(macro, i))
+                            asyncio.create_task(run_events_async(macro, i, cancellable=False))
                     else:
                         if macro.long_press == 1:
                             auto_enabled[i] = False

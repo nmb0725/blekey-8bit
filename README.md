@@ -57,6 +57,7 @@
 ```bash
 # mpremote 方式
 mpremote cp main.py :main.py
+mpremote cp macros.py :macros.py
 mpremote cp settings.py :settings.py
 mpremote cp wifi_manager.py :wifi_manager.py
 mpremote cp web_config.py :web_config.py
@@ -64,6 +65,9 @@ mpremote cp web_config.html :web_config.html
 mpremote cp macro_editor.html :macro_editor.html
 mpremote cp boot.py :boot.py
 ```
+
+> `settings.json` 和 `ble_hid_key.py` 是设备运行时生成的本地状态文件，不应提交到 Git。
+> 如果需要手动初始化 BLE 密钥文件，可参考 `ble_hid_key.example.py`，默认内容为空字典。
 
 ### 3. 首次配置 WiFi
 
@@ -104,7 +108,8 @@ mpremote cp boot.py :boot.py
 ```
 blekey-8bit/
 ├── main.py              # 主程序：配置加载、按键扫描、配置模式
-├── settings.py          # 配置模型、JSON 存储、宏注册表
+├── macros.py            # HID 事件模型、预设宏注册表、自定义宏转换
+├── settings.py          # 默认配置、配置校验、JSON 存储
 ├── wifi_manager.py      # WiFi 连接管理
 ├── web_config.py        # Web 服务器 + API
 ├── web_config.html      # Web 配置页面
