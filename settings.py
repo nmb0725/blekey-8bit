@@ -1,14 +1,7 @@
-from collections import namedtuple
 import ujson
+from macros import get_macro_names, normalize_custom_macro
 
 SETTINGS_FILE = "settings.json"
-
-KeyEvent = namedtuple("KeyEvent", ["delay", "action", "modifier", "keycode"])
-MouseEvent = namedtuple("MouseEvent", ["delay", "action", "button"])
-MouseMoveEvent = namedtuple("MouseMoveEvent", ["delay", "action", "x", "y"])
-WheelEvent = namedtuple("WheelEvent", ["delay", "action", "delta"])
-DelayEvent = namedtuple("DelayEvent", ["delay", "action"])
-KeyMacro = namedtuple("KeyMacro", ["events", "auto_interval", "long_press", "key", "modifiers", "button", "cancel"])
 
 DEFAULT_SETTINGS = {
     "button_configs": [
@@ -32,300 +25,153 @@ DEFAULT_SETTINGS = {
     "wifi_password": ""
 }
 
-def _build_macro_registry():
-    LEFT_CLICK_SPAM = KeyMacro(events=[
-        MouseEvent(delay=0, action="press", button="left"),
-        MouseEvent(delay=50, action="release", button="left")
-    ], auto_interval=50, long_press=1, key=None, modifiers=0x00, button=None, cancel=1)
 
-    MOUSE_WIGGLE = KeyMacro(events=[
-        MouseMoveEvent(delay=0, action="move", x=50, y=0),
-        DelayEvent(delay=200, action="delay"),
-        MouseMoveEvent(delay=0, action="move", x=-50, y=0)
-    ], auto_interval=200, long_press=1, key=None, modifiers=0x00, button=None, cancel=0)
+def _clone_default_settings():
+    return ujson.loads(ujson.dumps(DEFAULT_SETTINGS))
 
-    SCREENSHOT_COMBO = KeyMacro(events=[
-        KeyEvent(delay=0, action="press", modifier=0x01, keycode=0x00),
-        KeyEvent(delay=10, action="press", modifier=0x05, keycode=0x00),
-        KeyEvent(delay=10, action="press", modifier=0x05, keycode=0x04),
-        KeyEvent(delay=50, action="release", modifier=0x05, keycode=0x04),
-        KeyEvent(delay=10, action="release", modifier=0x01, keycode=0x00),
-        KeyEvent(delay=10, action="release", modifier=0x00, keycode=0x00)
-    ], auto_interval=0, long_press=0, key=None, modifiers=0x00, button=None, cancel=1)
 
-    F11_AUTO = KeyMacro(
-        events=[KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x44),
-                KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x44)],
-        auto_interval=50, long_press=1, key=None, modifiers=0, button=None, cancel=1
-    )
-    F12_AUTO = KeyMacro(
-        events=[KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x45),
-                KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x45)],
-        auto_interval=50, long_press=1, key=None, modifiers=0, button=None, cancel=1
-    )
-    R_AUTO = KeyMacro(
-        events=[KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x15),
-                KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x15)],
-        auto_interval=150, long_press=0, key=None, modifiers=0, button=None, cancel=1
-    )
-    T_AUTO = KeyMacro(
-        events=[KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x17),
-                KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x17)],
-        auto_interval=300, long_press=0, key=None, modifiers=0, button=None, cancel=1
-    )
-    LONG_SHIFT_T = KeyMacro(
-        events=[
-            KeyEvent(delay=0, action="press", modifier=0x02, keycode=0x00),
-            KeyEvent(delay=30, action="release", modifier=0x02, keycode=0x00),
-            DelayEvent(delay=200, action="delay"),
-            KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x17),
-            KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x17)
-        ],
-        auto_interval=150, long_press=1, key=None, modifiers=0, button=None, cancel=0
-    )
+def _int_value(value, default=0, minimum=None, maximum=None):
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        value = default
+    if minimum is not None and value < minimum:
+        return minimum
+    if maximum is not None and value > maximum:
+        return maximum
+    return value
 
-    UP = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x52, modifiers=0, button=None, cancel=1)
-    DOWN = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x51, modifiers=0, button=None, cancel=1)
-    LEFT = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x50, modifiers=0, button=None, cancel=1)
-    RIGHT = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x4F, modifiers=0, button=None, cancel=1)
-    KEY_6 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x23, modifiers=0, button=None, cancel=1)
 
-    CTRL_1 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x1E, modifiers=0x01, button=None, cancel=1)
-    CTRL_2 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x1F, modifiers=0x01, button=None, cancel=1)
-    CTRL_3 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x20, modifiers=0x01, button=None, cancel=1)
-    CTRL_4 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x21, modifiers=0x01, button=None, cancel=1)
+def _str_value(value, default=""):
+    if value is None:
+        return default
+    try:
+        return str(value)
+    except Exception:
+        return default
 
-    CTRL = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x00, modifiers=0x01, button=None, cancel=1)
-    F11 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x44, modifiers=0x00, button=None, cancel=1)
-    F12 = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x45, modifiers=0x00, button=None, cancel=1)
-    TAB = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x2B, modifiers=0x00, button=None, cancel=1)
-    CAPS = KeyMacro(events=[], auto_interval=0, long_press=0, key=0x39, modifiers=0x00, button=None, cancel=1)
 
-    LONG_PRESS_R = KeyMacro(events=[
-        KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x15),
-        DelayEvent(delay=1000, action="delay"),
-        KeyEvent(delay=0, action="release", modifier=0x00, keycode=0x15)
-    ], auto_interval=0, long_press=1, key=None, modifiers=0x00, button=None, cancel=1)
+def _normalize_pin(value, default):
+    # Keep validation conservative: reject impossible ESP32 GPIO numbers,
+    # but do not encode board-specific policy here.
+    value = _int_value(value, default)
+    if value < 0 or value > 39:
+        return default
+    return value
 
-    R_LONG = KeyMacro(events=[
-        KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x15),
-        KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x15)
-    ], auto_interval=150, long_press=1, key=None, modifiers=0x00, button=None, cancel=1)
 
-    T_LONG = KeyMacro(events=[
-        KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x17),
-        KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x17)
-    ], auto_interval=300, long_press=1, key=None, modifiers=0x00, button=None, cancel=1)
+def _normalize_button_configs(configs, defaults):
+    macro_names = get_macro_names()
+    if not isinstance(configs, list):
+        configs = []
+    normalized = []
+    count = len(configs) if configs else len(defaults)
+    for i in range(count):
+        default_cfg = defaults[i] if i < len(defaults) else defaults[-1]
+        cfg = configs[i] if i < len(configs) and isinstance(configs[i], dict) else {}
+        macro_name = cfg.get("macro", default_cfg.get("macro", "F12_AUTO"))
+        if macro_name not in macro_names:
+            macro_name = default_cfg.get("macro", "F12_AUTO")
+        custom_events = cfg.get("custom_events", None)
+        if macro_name == "CUSTOM":
+            custom_events = normalize_custom_macro(custom_events)
+            if custom_events is None:
+                macro_name = default_cfg.get("macro", "F12_AUTO")
+        elif custom_events is not None:
+            custom_events = normalize_custom_macro(custom_events)
+        normalized.append({
+            "pin": _normalize_pin(cfg.get("pin", default_cfg.get("pin", 5)), default_cfg.get("pin", 5)),
+            "macro": macro_name,
+            "custom_events": custom_events
+        })
+    return normalized
 
-    AUTO_2 = KeyMacro(events=[
-        KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x1F),
-        KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x1F)
-    ], auto_interval=50, long_press=1, key=None, modifiers=0x00, button=None, cancel=1)
 
-    AUTO_4 = KeyMacro(events=[
-        KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x21),
-        KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x21)
-    ], auto_interval=50, long_press=1, key=None, modifiers=0x00, button=None, cancel=1)
+def _normalize_pin_list(values, defaults):
+    if not isinstance(values, list):
+        values = []
+    normalized = []
+    for i, value in enumerate(values):
+        default = defaults[i] if i < len(defaults) else defaults[-1]
+        normalized.append(_normalize_pin(value, default))
+    return normalized or list(defaults)
 
-    AUTO_CAPS_E = KeyMacro(events=[
-        KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x39),
-        KeyEvent(delay=30, action="press", modifier=0x00, keycode=0x08),
-        KeyEvent(delay=30, action="release", modifier=0x00, keycode=0x08),
-        KeyEvent(delay=0, action="release", modifier=0x00, keycode=0x39),
-    ], auto_interval=50, long_press=1, key=None, modifiers=0x00, button=None, cancel=0)
 
-    CTRL_SHIFT_T = KeyMacro(events=[
-        KeyEvent(delay=0, action="press", modifier=0x03, keycode=0x17),
-        DelayEvent(delay=0, action="delay"),
-        KeyEvent(delay=0, action="release", modifier=0x03, keycode=0x17)
-    ], auto_interval=0, long_press=0, key=None, modifiers=0x00, button=None, cancel=1)
+def _normalize_trigger_indices(values, button_count):
+    if not isinstance(values, list):
+        values = []
+    normalized = []
+    for value in values:
+        idx = _int_value(value, -1)
+        if 0 <= idx < button_count and idx not in normalized:
+            normalized.append(idx)
+    if normalized:
+        return normalized
+    return [idx for idx in DEFAULT_SETTINGS["trigger_pins"] if idx < button_count]
 
-    ALT_R = KeyMacro(events=[
-        KeyEvent(delay=0, action="press", modifier=0x04, keycode=0x15),
-        DelayEvent(delay=0, action="delay"),
-        KeyEvent(delay=0, action="release", modifier=0x04, keycode=0x15)
-    ], auto_interval=0, long_press=0, key=None, modifiers=0x00, button=None, cancel=1)
 
-    LEFT_CLICK = KeyMacro(events=[
-        MouseEvent(delay=0, action="press", button="left"),
-        MouseEvent(delay=50, action="release", button="left")
-    ], auto_interval=0, long_press=0, key=None, modifiers=0x00, button=None, cancel=1)
+def normalize_settings(data):
+    defaults = _clone_default_settings()
+    if not isinstance(data, dict):
+        data = {}
+    settings = defaults
+    button_configs = _normalize_button_configs(data.get("button_configs"), defaults["button_configs"])
+    settings["button_configs"] = button_configs
+    settings["gnd_pins"] = _normalize_pin_list(data.get("gnd_pins"), defaults["gnd_pins"])
+    settings["trigger_pins"] = _normalize_trigger_indices(data.get("trigger_pins"), len(button_configs))
+    settings["long_press_ms"] = _int_value(data.get("long_press_ms", defaults["long_press_ms"]), defaults["long_press_ms"], 500)
+    settings["web_host"] = _str_value(data.get("web_host", defaults["web_host"]), defaults["web_host"])
+    settings["web_port"] = _int_value(data.get("web_port", defaults["web_port"]), defaults["web_port"], 1, 65535)
+    settings["wifi_ssid"] = _str_value(data.get("wifi_ssid", defaults["wifi_ssid"]), defaults["wifi_ssid"])
+    settings["wifi_password"] = _str_value(data.get("wifi_password", defaults["wifi_password"]), defaults["wifi_password"])
+    return settings
 
-    MIDDLE_CLICK = KeyMacro(events=[], auto_interval=0, long_press=0, key=None, modifiers=0x00, button="middle", cancel=1)
 
-    WHEEL_UP = KeyMacro(events=[
-        WheelEvent(delay=0, action="scroll", delta=120)
-    ], auto_interval=0, long_press=0, key=None, modifiers=0x00, button=None, cancel=1)
+def _write_settings(data):
+    with open(SETTINGS_FILE, "w") as f:
+        ujson.dump(data, f)
 
-    LEFT_CLICK_AUTO = KeyMacro(events=[
-        MouseEvent(delay=0, action="press", button="left"),
-        MouseEvent(delay=50, action="release", button="left")
-    ], auto_interval=100, long_press=0, key=None, modifiers=0x00, button=None, cancel=1)
-
-    MOUSE_MOVE_RIGHT = KeyMacro(events=[
-        MouseMoveEvent(delay=0, action="move", x=10, y=0)
-    ], auto_interval=0, long_press=0, key=None, modifiers=0x00, button=None, cancel=1)
-
-    W_SWITCH = KeyMacro(
-        events=[KeyEvent(delay=0, action="press", modifier=0x00, keycode=0x1A)],
-        auto_interval=1000, long_press=0, key=None, modifiers=0x00, button=None, cancel=1
-    )
-
-    return {
-        "LEFT_CLICK_SPAM": LEFT_CLICK_SPAM,
-        "MOUSE_WIGGLE": MOUSE_WIGGLE,
-        "SCREENSHOT_COMBO": SCREENSHOT_COMBO,
-        "F11_AUTO": F11_AUTO,
-        "F12_AUTO": F12_AUTO,
-        "R_AUTO": R_AUTO,
-        "T_AUTO": T_AUTO,
-        "LONG_SHIFT_T": LONG_SHIFT_T,
-        "W_SWITCH": W_SWITCH,
-        "UP": UP,
-        "DOWN": DOWN,
-        "LEFT": LEFT,
-        "RIGHT": RIGHT,
-        "KEY_6": KEY_6,
-        "CTRL_1": CTRL_1,
-        "CTRL_2": CTRL_2,
-        "CTRL_3": CTRL_3,
-        "CTRL_4": CTRL_4,
-        "CTRL": CTRL,
-        "F11": F11,
-        "F12": F12,
-        "TAB": TAB,
-        "CAPS": CAPS,
-        "LONG_PRESS_R": LONG_PRESS_R,
-        "R_LONG": R_LONG,
-        "T_LONG": T_LONG,
-        "AUTO_2": AUTO_2,
-        "AUTO_4": AUTO_4,
-        "AUTO_CAPS_E": AUTO_CAPS_E,
-        "CTRL_SHIFT_T": CTRL_SHIFT_T,
-        "ALT_R": ALT_R,
-        "LEFT_CLICK": LEFT_CLICK,
-        "MIDDLE_CLICK": MIDDLE_CLICK,
-        "WHEEL_UP": WHEEL_UP,
-        "LEFT_CLICK_AUTO": LEFT_CLICK_AUTO,
-        "MOUSE_MOVE_RIGHT": MOUSE_MOVE_RIGHT,
-    }
-
-MACRO_REGISTRY = _build_macro_registry()
-
-def get_macro_registry():
-    return MACRO_REGISTRY
-
-def get_macro_names():
-    names = sorted(MACRO_REGISTRY.keys())
-    return ["DISABLED", "CUSTOM"] + names
-
-def parse_custom_macro(data):
-    if data is None:
-        return None
-    events = []
-    for e in data.get("custom_events", []):
-        t = e.get("type", "")
-        delay = e.get("delay", 0)
-        if t == "key":
-            events.append(KeyEvent(delay=delay, action=e.get("action", "press"),
-                                   modifier=e.get("modifier", 0), keycode=e.get("keycode", 0)))
-        elif t == "mouse":
-            events.append(MouseEvent(delay=delay, action=e.get("action", "press"),
-                                     button=e.get("button", "left")))
-        elif t == "move":
-            events.append(MouseMoveEvent(delay=delay, action="move",
-                                         x=e.get("x", 0), y=e.get("y", 0)))
-        elif t == "wheel":
-            events.append(WheelEvent(delay=delay, action="scroll",
-                                     delta=e.get("delta", 0)))
-        elif t == "delay":
-            events.append(DelayEvent(delay=delay, action="delay"))
-    return KeyMacro(
-        events=events,
-        auto_interval=data.get("auto_interval", 0),
-        long_press=data.get("long_press", 0),
-        key=None,
-        modifiers=0,
-        button=None,
-        cancel=data.get("cancel", 1)
-    )
-
-def custom_macro_to_dict(macro):
-    if macro is None:
-        return None
-    event_list = []
-    for e in macro.events:
-        if isinstance(e, KeyEvent):
-            event_list.append({"type": "key", "delay": e.delay, "action": e.action,
-                               "modifier": e.modifier, "keycode": e.keycode})
-        elif isinstance(e, MouseEvent):
-            event_list.append({"type": "mouse", "delay": e.delay, "action": e.action,
-                               "button": e.button})
-        elif isinstance(e, MouseMoveEvent):
-            event_list.append({"type": "move", "delay": e.delay, "action": "move",
-                               "x": e.x, "y": e.y})
-        elif isinstance(e, WheelEvent):
-            event_list.append({"type": "wheel", "delay": e.delay, "action": "scroll",
-                               "delta": e.delta})
-        elif isinstance(e, DelayEvent):
-            event_list.append({"type": "delay", "delay": e.delay, "action": "delay"})
-    return {
-        "custom_events": event_list,
-        "auto_interval": macro.auto_interval,
-        "long_press": macro.long_press,
-        "cancel": macro.cancel
-    }
 
 def load_settings():
     try:
         with open(SETTINGS_FILE, "r") as f:
             data = ujson.load(f)
-            if "button_configs" in data:
-                merged = False
-                for key in DEFAULT_SETTINGS:
-                    if key not in data:
-                        data[key] = DEFAULT_SETTINGS[key]
-                        merged = True
-                if merged:
-                    try:
-                        with open(SETTINGS_FILE, "w") as f:
-                            ujson.dump(data, f)
-                        print("Merged missing default fields into settings.json")
-                    except:
-                        pass
-                return data
-    except:
-        pass
-    defaults = DEFAULT_SETTINGS.copy()
-    try:
-        with open(SETTINGS_FILE, "w") as f:
-            ujson.dump(defaults, f)
-        print("Created settings.json with default values")
-    except:
-        pass
-    return defaults
+        normalized = normalize_settings(data)
+        if normalized != data:
+            _write_settings(normalized)
+            print("Normalized settings.json")
+        return normalized
+    except OSError:
+        defaults = _clone_default_settings()
+        try:
+            _write_settings(defaults)
+            print("Created settings.json with default values")
+        except OSError as e:
+            print("Unable to create settings.json:", e)
+        return defaults
+    except (ValueError, TypeError) as e:
+        defaults = _clone_default_settings()
+        print("Invalid settings.json, using defaults:", e)
+        return defaults
+
 
 def save_settings(data):
-    current = DEFAULT_SETTINGS.copy()
+    current = _clone_default_settings()
     old_configs = None
     try:
         with open(SETTINGS_FILE, "r") as f:
-            old = ujson.load(f)
-            if "button_configs" in old:
-                current = old
-                for key in DEFAULT_SETTINGS:
-                    if key not in current:
-                        current[key] = DEFAULT_SETTINGS[key]
-                old_configs = old.get("button_configs", [])
-    except:
-        pass
+            current = normalize_settings(ujson.load(f))
+            old_configs = current.get("button_configs", [])
+    except (OSError, ValueError, TypeError) as e:
+        print("Unable to load current settings before save:", e)
+    if not isinstance(data, dict):
+        data = {}
     current.update(data)
     if "button_configs" in data and old_configs:
-        new_configs = data["button_configs"]
-        for i, cfg in enumerate(current["button_configs"]):
-            if i < len(new_configs):
+        new_configs = data["button_configs"] if isinstance(data["button_configs"], list) else []
+        for i, cfg in enumerate(current.get("button_configs", [])):
+            if i < len(new_configs) and isinstance(new_configs[i], dict):
                 if new_configs[i].get("macro") == "CUSTOM" and new_configs[i].get("custom_events") is None:
                     if i < len(old_configs) and old_configs[i].get("custom_events") is not None:
                         cfg["custom_events"] = old_configs[i]["custom_events"]
-    with open(SETTINGS_FILE, "w") as f:
-        ujson.dump(current, f)
+    _write_settings(normalize_settings(current))
