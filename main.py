@@ -7,11 +7,11 @@ import struct
 import gc
 from ble_hid import HID
 from macros import (
-    KeyEvent, MouseEvent, MouseMoveEvent, WheelEvent,
+    KeyEvent, MouseEvent, MouseMoveEvent, WheelEvent, DelayEvent,
     get_macro_registry, parse_custom_macro
 )
 from settings import load_settings
-from wifi_manager import connect_wifi
+from wifi_manager import connect_wifi, disconnect_wifi
 from web_config import start_web_server, stop_web_server
 
 freq(160000000)
@@ -61,8 +61,8 @@ class MyHID(HID):
         super().__init__(name)
         try:
             self._ble.config(bond=True, le_sec=True, io=0)
-        except Exception as e:
-            print("BLE security config unavailable:", e)
+        except:
+            pass
         self._ble.irq(self._custom_irq)
         self.start_advertising(name)
 
@@ -70,11 +70,8 @@ class MyHID(HID):
         try:
             import ble_hid_key
             self.secrets = ble_hid_key.keys
-        except ImportError:
-            self.secrets = {}
-        except Exception as e:
-            print("Unable to load BLE bonding keys:", e)
-            self.secrets = {}
+        except:
+            pass
 
     def start_advertising(self, name):
         payload = bytearray(b'\x02\x01\x06')
@@ -96,8 +93,8 @@ class MyHID(HID):
             try:
                 with open("ble_hid_key.py", "w") as f:
                     f.write("keys = " + repr(self.secrets))
-            except OSError as e:
-                print("Unable to save BLE bonding keys:", e)
+            except:
+                pass
             return True
         elif event == _IRQ_CENTRAL_CONNECT:
             self.conn_handle = data[0]
@@ -122,8 +119,8 @@ class MyHID(HID):
                 self._ble.gatts_notify(self.conn_handle, self.k_rep, buf)
                 if not pressed and mod != 0:
                     self._ble.gatts_notify(self.conn_handle, self.k_rep, b'\x00\x00\x00\x00\x00\x00\x00\x00')
-            except Exception as e:
-                print("Keyboard notify failed:", e)
+            except:
+                pass
 
     def send_mouse(self, buttons=0, x=0, y=0, wheel=0):
         if self.is_connected():
@@ -133,8 +130,8 @@ class MyHID(HID):
             buf = struct.pack('bbbb', buttons, x, y, wheel)
             try:
                 self._ble.gatts_notify(self.conn_handle, self.m_rep, buf)
-            except Exception as e:
-                print("Mouse notify failed:", e)
+            except:
+                pass
 
     def release_all(self):
         if self.is_connected():
@@ -143,8 +140,8 @@ class MyHID(HID):
                 self.send_mouse(0, 0, 0, 0)
                 time.sleep_ms(5)
                 self._ble.gatts_notify(self.conn_handle, self.k_rep, b'\x00\x00\x00\x00\x00\x00\x00\x00')
-            except Exception as e:
-                print("Release all failed:", e)
+            except:
+                pass
 
 ble_hid = MyHID(MY_HID_NAME)
 
@@ -157,9 +154,6 @@ trigger_press_start = [0] * len(trigger_indices)
 
 async def run_events_async(macro, idx, cancellable=False):
     for event in macro.events:
-        # Only long/auto-running macros should stop on release. One-shot event
-        # macros are scheduled while auto_enabled is false, so checking cancel
-        # unconditionally makes them no-op.
         if cancellable and macro.cancel == 1 and not auto_enabled[idx]:
             break
         if isinstance(event, KeyEvent):
@@ -221,7 +215,8 @@ async def config_mode():
     config_mode_trigger = True
     ble_hid.release_all()
     print("Connecting to WiFi...")
-    blink_task = asyncio.create_task(_blink_led(300))
+    led_pin.value(0)
+    blink_task = asyncio.create_task(_blink_led(200))
     success, ip = connect_wifi(timeout=10)
     blink_task.cancel()
     led_pin.value(0)
@@ -231,7 +226,6 @@ async def config_mode():
         return
     print("WiFi connected. IP: %s" % ip)
     print("Config mode: http://%s" % ip)
-    led_pin.value(1)
     server_task = start_web_server()
     await wait_for_exit_trigger()
     print("Exit trigger detected, saving and rebooting...")

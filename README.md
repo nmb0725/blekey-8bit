@@ -74,7 +74,7 @@ mpremote cp boot.py :boot.py
 1. 上电后 ESP32 开始 BLE 广播，设备名 `ble_keyboard_mouse`
 2. 长按 **按键 0 + 按键 1** 3 秒进入配置模式
 3. LED 快速闪烁表示正在连接 WiFi
-4. 连接成功后 LED 常亮，串口输出 IP 地址
+4. 连接成功后 LED 熄灭，串口输出 IP 地址
 5. 浏览器访问 `http://<IP>/` 打开配置页面
 6. 填写 WiFi SSID 和密码，点击 Save & Reboot
 7. 重启后即可通过 Web 页面管理按键配置
@@ -100,8 +100,8 @@ mpremote cp boot.py :boot.py
 |----------|------|
 | 常亮，每 5 秒闪一次 | BLE 已连接，正常工作 |
 | 500ms 交替闪烁 | BLE 广播中，等待配对 |
-| 300ms 快速闪烁 | 正在连接 WiFi |
-| 常亮 | 配置模式运行中 |
+| 200ms 快速闪烁 | 正在连接 WiFi |
+| 熄灭 | 配置模式运行中 |
 
 ## 项目文件结构
 

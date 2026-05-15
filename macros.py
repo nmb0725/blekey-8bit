@@ -199,79 +199,7 @@ def get_macro_names():
     return ["DISABLED", "CUSTOM"] + names
 
 
-def _int_value(value, default=0, minimum=None, maximum=None):
-    try:
-        value = int(value)
-    except (TypeError, ValueError):
-        value = default
-    if minimum is not None and value < minimum:
-        return minimum
-    if maximum is not None and value > maximum:
-        return maximum
-    return value
-
-
-def _normalize_event(event):
-    if not isinstance(event, dict):
-        return None
-    event_type = event.get("type", "")
-    delay = _int_value(event.get("delay", 0), 0, 0)
-    if event_type == "key":
-        return {
-            "type": "key",
-            "delay": delay,
-            "action": event.get("action", "press") if event.get("action") in ("press", "release") else "press",
-            "modifier": _int_value(event.get("modifier", 0), 0, 0, 255),
-            "keycode": _int_value(event.get("keycode", 0), 0, 0, 255)
-        }
-    if event_type == "mouse":
-        button = event.get("button", "left")
-        if button not in ("left", "right", "middle"):
-            button = "left"
-        return {
-            "type": "mouse",
-            "delay": delay,
-            "action": event.get("action", "press") if event.get("action") in ("press", "release") else "press",
-            "button": button
-        }
-    if event_type == "move":
-        return {
-            "type": "move",
-            "delay": delay,
-            "action": "move",
-            "x": _int_value(event.get("x", 0), 0, -127, 127),
-            "y": _int_value(event.get("y", 0), 0, -127, 127)
-        }
-    if event_type == "wheel":
-        return {
-            "type": "wheel",
-            "delay": delay,
-            "action": "scroll",
-            "delta": _int_value(event.get("delta", 0), 0, -127, 127)
-        }
-    if event_type == "delay":
-        return {"type": "delay", "delay": delay, "action": "delay"}
-    return None
-
-
-def normalize_custom_macro(data):
-    if not isinstance(data, dict):
-        return None
-    events = []
-    for event in data.get("custom_events", []):
-        normalized = _normalize_event(event)
-        if normalized is not None:
-            events.append(normalized)
-    return {
-        "custom_events": events,
-        "auto_interval": _int_value(data.get("auto_interval", 0), 0, 0),
-        "long_press": 1 if data.get("long_press", 0) else 0,
-        "cancel": 1 if data.get("cancel", 1) else 0
-    }
-
-
 def parse_custom_macro(data):
-    data = normalize_custom_macro(data)
     if data is None:
         return None
     events = []
