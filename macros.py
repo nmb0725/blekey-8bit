@@ -250,9 +250,16 @@ def custom_macro_to_dict(macro):
                                "delta": e.delta})
         elif isinstance(e, DelayEvent):
             event_list.append({"type": "delay", "delay": e.delay, "action": "delay"})
-    return {
+    result = {
         "custom_events": event_list,
         "auto_interval": macro.auto_interval,
         "long_press": macro.long_press,
         "cancel": macro.cancel
     }
+    # 新增：输出单键映射字段
+    if macro.key is not None:
+        result["key"] = macro.key
+        result["modifiers"] = macro.modifiers
+    if macro.button is not None:
+        result["button"] = macro.button
+    return result

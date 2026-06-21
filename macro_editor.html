@@ -23,6 +23,9 @@ input[type=text],input[type=number]{padding:5px;background:#222;border:1px solid
 .event-row .evt-key{width:55px}
 .event-row .evt-button{width:75px}
 .event-row .evt-x,.event-row .evt-y,.event-row .evt-delta{width:55px}
+.event-row .evt-move{padding:4px 6px;background:#222;border:1px solid #333;color:#888;border-radius:3px;cursor:pointer;font-size:14px;line-height:1;min-width:24px;text-align:center}
+.event-row .evt-move:hover{background:#333;color:#eee}
+.event-row .evt-move:disabled{opacity:0.3;cursor:not-allowed}
 .event-row .evt-del{padding:4px 8px;background:#d32f2f33;border:1px solid #d32f2f;color:#ff5252;border-radius:3px;cursor:pointer;font-size:14px}
 .event-row .evt-del:hover{background:#d32f2f66}
 .evt-params{display:inline-flex;gap:4px;align-items:center}
@@ -104,7 +107,7 @@ fetch('/api/settings').then(function(r){return r.json()}).then(function(d){
   var s=d.settings;
   var btn=s.button_configs[idx];
   document.getElementById('btn-pin').textContent=btn.pin;
-  if(btn.custom_events&&btn.custom_events.custom_events){
+  if(btn.custom_events){
     loadMacro(btn.custom_events);
   }else if(btn.macro&&btn.macro!=='DISABLED'){
     fetch('/api/macro/'+btn.macro).then(function(r){return r.json()}).then(function(m){loadMacro(m)});
@@ -115,8 +118,17 @@ function loadMacro(m){
   document.getElementById('auto_interval').value=m.auto_interval||0;
   document.getElementById('long_press').checked=!!m.long_press;
   document.getElementById('cancel').checked=!!m.cancel;
-  if(m.custom_events){
+  if(m.custom_events && m.custom_events.length > 0){
+    // 有事件序列，直接加载
     m.custom_events.forEach(function(e){addEvent(e)});
+  } else if(m.key !== undefined && m.key !== null){
+    // 单键键盘映射 → 生成 press + release 事件
+    addEvent({type:'key', delay:0, action:'press', modifier:m.modifiers||0, keycode:m.key});
+    addEvent({type:'key', delay:30, action:'release', modifier:0, keycode:0});
+  } else if(m.button){
+    // 鼠标按键映射 → 生成 press + release 事件
+    addEvent({type:'mouse', delay:0, action:'press', button:m.button});
+    addEvent({type:'mouse', delay:50, action:'release', button:m.button});
   }
 }
 function addEvent(evt){
@@ -125,7 +137,9 @@ function addEvent(evt){
   var div=document.createElement('div');
   div.className='event-row';
   div.id=id;
-  var html='<select class="evt-type" onchange="onTypeChange(\''+id+'\')">';
+  var html='<button class="evt-move move-up" onclick="moveEvent(this,-1)" title="Up">↑</button>';
+  html+='<button class="evt-move move-down" onclick="moveEvent(this,1)" title="Down">↓</button>';
+  html+='<select class="evt-type" onchange="onTypeChange(\''+id+'\')">';
   ['key','mouse','move','wheel','delay'].forEach(function(t){
     html+='<option'+(t==evt.type?' selected':'')+'>'+t+'</option>';
   });
@@ -136,6 +150,7 @@ function addEvent(evt){
   div.innerHTML=html;
   document.getElementById('events').appendChild(div);
   updateParams(id,evt);
+  updateMoveButtons();
 }
 function updateParams(id,evt){
   var params=document.getElementById('params_'+id);
@@ -203,6 +218,29 @@ function onModSelect(sel){
 }
 function delEvent(id){
   document.getElementById(id).remove();
+  updateMoveButtons();
+}
+function moveEvent(btn, direction){
+  var row = btn.closest('.event-row');
+  var parent = document.getElementById('events');
+  var rows = Array.from(parent.querySelectorAll('.event-row'));
+  var idx = rows.indexOf(row);
+
+  if(direction === -1 && idx > 0){
+    parent.insertBefore(row, rows[idx-1]);
+  } else if(direction === 1 && idx < rows.length-1){
+    parent.insertBefore(rows[idx+1], row);
+  }
+  updateMoveButtons();
+}
+function updateMoveButtons(){
+  var rows = document.querySelectorAll('#events .event-row');
+  rows.forEach(function(row, i){
+    var upBtn = row.querySelector('.move-up');
+    var downBtn = row.querySelector('.move-down');
+    if(upBtn) upBtn.disabled = (i === 0);
+    if(downBtn) downBtn.disabled = (i === rows.length - 1);
+  });
 }
 function saveMacro(){
   var events=[];
