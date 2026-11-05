@@ -1,4 +1,7 @@
+__pycache__/
 settings.json
+settings.json.bak
+settings.json.tmp
 ble_hid_key.py
 .trae/
 test.py

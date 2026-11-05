@@ -1,4 +1,5 @@
 import ujson
+import os
 
 SETTINGS_FILE = "settings.json"
 
@@ -24,37 +25,49 @@ DEFAULT_SETTINGS = {
     "wifi_password": ""
 }
 
+def _defaults_copy():
+    return ujson.loads(ujson.dumps(DEFAULT_SETTINGS))
+
+def _atomic_write(data):
+    tmp = SETTINGS_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        ujson.dump(data, f)
+    try:
+        os.remove(SETTINGS_FILE)
+    except OSError:
+        pass
+    os.rename(tmp, SETTINGS_FILE)
+
 def load_settings():
+    data = None
     try:
         with open(SETTINGS_FILE, "r") as f:
             data = ujson.load(f)
-            if "button_configs" in data:
-                merged = False
-                for key in DEFAULT_SETTINGS:
-                    if key not in data:
-                        data[key] = DEFAULT_SETTINGS[key]
-                        merged = True
-                if merged:
-                    try:
-                        with open(SETTINGS_FILE, "w") as f:
-                            ujson.dump(data, f)
-                        print("Merged missing default fields into settings.json")
-                    except Exception as e:
-                        print("settings write:", e)
-                return data
-    except:
-        pass
-    defaults = ujson.loads(ujson.dumps(DEFAULT_SETTINGS))
+    except OSError:
+        print("settings.json not found, creating defaults")
+    except Exception as e:
+        print("settings.json corrupt:", e)
+        try:
+            os.rename(SETTINGS_FILE, "settings.json.bak")
+            print("Corrupt settings backed up to settings.json.bak")
+        except Exception:
+            pass
+    if isinstance(data, dict) and "button_configs" in data:
+        # 读取路径绝不写文件：缺失字段仅在内存中补齐
+        for key in DEFAULT_SETTINGS:
+            if key not in data:
+                data[key] = DEFAULT_SETTINGS[key]
+        return data
+    defaults = _defaults_copy()
     try:
-        with open(SETTINGS_FILE, "w") as f:
-            ujson.dump(defaults, f)
+        _atomic_write(defaults)
         print("Created settings.json with default values")
     except Exception as e:
         print("settings write:", e)
     return defaults
 
 def save_settings(data):
-    current = ujson.loads(ujson.dumps(DEFAULT_SETTINGS))
+    current = _defaults_copy()
     old_configs = None
     try:
         with open(SETTINGS_FILE, "r") as f:
@@ -75,5 +88,7 @@ def save_settings(data):
                 if new_configs[i].get("macro") == "CUSTOM" and new_configs[i].get("custom_events") is None:
                     if i < len(old_configs) and old_configs[i].get("custom_events") is not None:
                         cfg["custom_events"] = old_configs[i]["custom_events"]
-    with open(SETTINGS_FILE, "w") as f:
-        ujson.dump(current, f)
+    try:
+        _atomic_write(current)
+    except Exception as e:
+        print("settings write:", e)
