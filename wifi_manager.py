@@ -1,5 +1,6 @@
 import network
 import time
+import asyncio
 from settings import load_settings
 
 def connect_wifi(timeout=10):
@@ -27,3 +28,23 @@ def disconnect_wifi():
     if wlan.isconnected():
         wlan.disconnect()
     wlan.active(False)
+
+async def connect_wifi_async(timeout=10):
+    settings = load_settings()
+    ssid = settings.get("wifi_ssid", "")
+    password = settings.get("wifi_password", "")
+    if not ssid:
+        print("WiFi SSID not configured, skipping WiFi connection")
+        return False, None
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    if wlan.isconnected():
+        return True, wlan.ifconfig()[0]
+    wlan.connect(ssid, password)
+    start = time.ticks_ms()
+    while not wlan.isconnected():
+        if time.ticks_diff(time.ticks_ms(), start) > timeout * 1000:
+            wlan.active(False)
+            return False, None
+        await asyncio.sleep_ms(100)
+    return True, wlan.ifconfig()[0]

@@ -39,22 +39,22 @@ def load_settings():
                         with open(SETTINGS_FILE, "w") as f:
                             ujson.dump(data, f)
                         print("Merged missing default fields into settings.json")
-                    except:
-                        pass
+                    except Exception as e:
+                        print("settings write:", e)
                 return data
     except:
         pass
-    defaults = DEFAULT_SETTINGS.copy()
+    defaults = ujson.loads(ujson.dumps(DEFAULT_SETTINGS))
     try:
         with open(SETTINGS_FILE, "w") as f:
             ujson.dump(defaults, f)
         print("Created settings.json with default values")
-    except:
-        pass
+    except Exception as e:
+        print("settings write:", e)
     return defaults
 
 def save_settings(data):
-    current = DEFAULT_SETTINGS.copy()
+    current = ujson.loads(ujson.dumps(DEFAULT_SETTINGS))
     old_configs = None
     try:
         with open(SETTINGS_FILE, "r") as f:

@@ -11,7 +11,7 @@ from macros import (
     get_macro_registry, parse_custom_macro
 )
 from settings import load_settings
-from wifi_manager import connect_wifi, disconnect_wifi
+from wifi_manager import connect_wifi_async, disconnect_wifi
 from web_config import start_web_server, stop_web_server
 
 freq(160000000)
@@ -70,8 +70,8 @@ class MyHID(HID):
         try:
             import ble_hid_key
             self.secrets = ble_hid_key.keys
-        except:
-            pass
+        except Exception as e:
+            print("load secrets:", e)
 
     def start_advertising(self, name):
         payload = bytearray(b'\x02\x01\x06')
@@ -93,8 +93,8 @@ class MyHID(HID):
             try:
                 with open("ble_hid_key.py", "w") as f:
                     f.write("keys = " + repr(self.secrets))
-            except:
-                pass
+            except Exception as e:
+                print("save secrets:", e)
             return True
         elif event == _IRQ_CENTRAL_CONNECT:
             self.conn_handle = data[0]
@@ -217,7 +217,7 @@ async def config_mode():
     print("Connecting to WiFi...")
     led_pin.value(0)
     blink_task = asyncio.create_task(_blink_led(200))
-    success, ip = connect_wifi(timeout=10)
+    success, ip = await connect_wifi_async(timeout=10)
     blink_task.cancel()
     led_pin.value(0)
     if not success:
@@ -296,7 +296,7 @@ async def button_scanner():
                             else:
                                 if active_tasks[i]:
                                     active_tasks[i].cancel()
-                        elif macro.key:
+                        elif macro.key is not None:
                             ble_hid.send_raw(macro.modifiers, macro.key, True)
                         elif macro.button:
                             btn_val = 1 if macro.button == "left" else 2 if macro.button == "right" else 4
@@ -310,7 +310,7 @@ async def button_scanner():
                                 active_tasks[i].cancel()
                                 active_tasks[i] = None
                             ble_hid.release_all()
-                        elif macro.key:
+                        elif macro.key is not None:
                             ble_hid.send_raw(macro.modifiers, macro.key, False)
                         elif macro.button:
                             ble_hid.send_mouse(buttons=0)

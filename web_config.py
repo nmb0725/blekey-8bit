@@ -6,6 +6,7 @@ from macros import get_macro_names, get_macro_registry, custom_macro_to_dict
 from settings import load_settings, save_settings
 
 SERVER_RUNNING = True
+PENDING_REBOOT = False
 
 def _send_headers(conn, status, content_type):
     response = "HTTP/1.1 %d OK\r\n" % status
@@ -119,9 +120,8 @@ def _handle_api_settings(conn, method, body):
 
 def _handle_api_reboot(conn):
     _send_json(conn, {"status": "rebooting"})
-    global SERVER_RUNNING
-    SERVER_RUNNING = False
-    machine.reset()
+    global PENDING_REBOOT
+    PENDING_REBOOT = True
 
 def _handle_api_macros(conn):
     names = get_macro_names()
@@ -180,9 +180,13 @@ async def run_web_server():
         while SERVER_RUNNING:
             try:
                 conn, _ = s.accept()
+                conn.settimeout(5)
                 _handle_request(conn)
             except OSError:
                 pass
+            if PENDING_REBOOT:
+                await asyncio.sleep_ms(500)
+                machine.reset()
             await asyncio.sleep_ms(50)
     except Exception as e:
         print("Web server error:", e)

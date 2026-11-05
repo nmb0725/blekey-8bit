@@ -1,3 +1,6 @@
 settings.json
 ble_hid_key.py
 .trae/
+test.py
+bletest.py
+test_web.py
