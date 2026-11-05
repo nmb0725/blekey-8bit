@@ -54,7 +54,7 @@
 blekey-8bit/
 ├── main.py              # 主程序：配置加载、按键扫描、配置模式触发
 ├── macros.py            # HID 事件模型、预设宏注册表、自定义宏转换
-├── settings.py          # 默认配置、JSON 存储
+├── settings.py          # 默认配置、JSON 存储（原子写入 + 损坏备份）
 ├── wifi_manager.py      # WiFi 连接管理
 ├── web_config.py        # Web 服务器 + API 路由
 ├── web_config.html      # Web 配置页面（独立 HTML 文件）
@@ -63,8 +63,8 @@ blekey-8bit/
 ├── ble_hid_key.py       # BLE 配对密钥（自动生成）
 ├── boot.py              # MicroPython 启动引导文件
 ├── blekey-8bit.py       # (旧版本) 基于硬件定时器的旧版固件
-├── bletest.py           # (测试/变体) 与 main.py 架构相同，宏配置不同
-├── test.py              # (测试脚本) 简单的 BLE HID 连接测试
+├── bletest.py           # (测试/变体) 与 main.py 架构相同，宏配置不同（仅本地保留，不跟踪 Git）
+├── test.py              # (测试脚本) 简单的 BLE HID 连接测试（仅本地保留，不跟踪 Git）
 └── .gitattributes       # Git 换行符配置
 ```
 
@@ -724,9 +724,12 @@ prev_state   = [1] * len(button_pins)      # 每个按键的上一次电平状�
 
 - **用途**：配置持久化管理
 - **功能**：
-  - 定义 `DEFAULT_SETTINGS` 默认配置
+  - 定义 `DEFAULT_SETTINGS` 默认配置，通过 ujson 往返深拷贝（`_defaults_copy`）避免与运行时数据共享
   - 管理 `settings.json` 的加载/保存/合并
   - 处理 CUSTOM 宏的 custom_events 保留逻辑
+  - **原子写入**（`_atomic_write`）：先写 `settings.json.tmp` 再 rename，避免写一半时复位导致文件截断
+  - **损坏保护**：JSON 解析失败时先备份为 `settings.json.bak` 再重建默认配置，不静默覆盖用户数据
+  - **读取路径不写文件**：`load_settings()` 缺失字段仅内存补齐，只有文件缺失/损坏时才创建
 
 ### 7.4 wifi_manager.py（新增）
 
@@ -735,6 +738,7 @@ prev_state   = [1] * len(button_pins)      # 每个按键的上一次电平状�
   - 从 `settings.json` 读取 SSID/密码
   - 连接预设 WiFi 网络（超时处理）
   - 断开 WiFi 连接
+  - **`connect_wifi_async()`**：异步连接版本，等待循环用 `await asyncio.sleep_ms(100)` 让出事件循环，连接期间 LED 动画不冻结（main.py 配置模式实际调用此版本；`connect_wifi()` 保留为同步版本）
 
 ### 7.5 web_config.py（新增）
 
@@ -744,6 +748,8 @@ prev_state   = [1] * len(button_pins)      # 每个按键的上一次电平状�
   - 路由分发：主页面、宏编辑器页面、API 接口
   - API：`/api/settings`、`/api/macros`、`/api/macro/<name>`、`/api/reboot`
   - HTML 文件流式发送（128 字节分块，避免内存溢出）
+  - **防挂起**：`conn.settimeout(5)`，客户端挂起不会卡死服务器
+  - **延迟复位**：`/api/reboot` 只置 `PENDING_REBOOT` 标志，响应发送完毕、服务器退出主循环后才 `machine.reset()`，浏览器能正常收到响应
 
 ### 7.6 web_config.html（新增）
 
@@ -779,17 +785,19 @@ prev_state   = [1] * len(button_pins)      # 每个按键的上一次电平状�
   - CPU 频率降低到 80MHz（省电）
   - 连接超时检测（300 秒）
 
-### 7.9 bletest.py（测试变体）
+### 7.9 bletest.py（测试变体，仅本地保留）
 
 - **用途**：与 main.py 架构相同的测试版本，宏配置略有不同
+- **注意**：已从 Git 仓库移除跟踪，仅作为本地测试脚本保留
 - **特点**：
   - 与 main.py 共享相同的 `MyHID` 类定义
   - 宏配置：`MOUSE_WIGGLE`, `F11_AUTO`, `T_AUTO`, `R_AUTO`, `KEY_6` 等
   - 10 个按键，引脚分配与 main.py 相同
 
-### 7.10 test.py（简单测试）
+### 7.10 test.py（简单测试，仅本地保留）
 
 - **用途**：快速测试 BLE HID 连接和按键发送功能
+- **注意**：已从 Git 仓库移除跟踪，仅作为本地测试脚本保留
 - **特点**：
   - 连接成功后发送字母 "A"（0x04）按键
   - 每 2 秒发送一次

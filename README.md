@@ -109,7 +109,7 @@ mpremote cp boot.py :boot.py
 blekey-8bit/
 ├── main.py              # 主程序：配置加载、按键扫描、配置模式
 ├── macros.py            # HID 事件模型、预设宏注册表、自定义宏转换
-├── settings.py          # 默认配置、配置校验、JSON 存储
+├── settings.py          # 默认配置、配置校验、JSON 存储（原子写入 + 损坏备份）
 ├── wifi_manager.py      # WiFi 连接管理
 ├── web_config.py        # Web 服务器 + API
 ├── web_config.html      # Web 配置页面
@@ -118,8 +118,8 @@ blekey-8bit/
 ├── ble_hid_key.py       # BLE 配对密钥（自动生成）
 ├── boot.py              # MicroPython 启动引导
 ├── blekey-8bit.py       # 旧版固件（硬件定时器版本）
-├── bletest.py           # 测试变体
-└── test.py              # BLE 连接测试
+├── bletest.py           # 测试变体（仅本地保留，不跟踪 Git）
+└── test.py              # BLE 连接测试（仅本地保留，不跟踪 Git）
 ```
 
 ## 技术栈
