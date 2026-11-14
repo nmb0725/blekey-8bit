@@ -1,5 +1,6 @@
 import ujson
 import os
+import gc
 
 SETTINGS_FILE = "settings.json"
 
@@ -28,25 +29,47 @@ DEFAULT_SETTINGS = {
 def _defaults_copy():
     return ujson.loads(ujson.dumps(DEFAULT_SETTINGS))
 
+def _sync():
+    # 部分 MicroPython 端口没有 os.sync()：缺失时退化为仅依赖 flush()
+    try:
+        os.sync()
+    except Exception:
+        pass
+
 def _atomic_write(data):
     tmp = SETTINGS_FILE + ".tmp"
     with open(tmp, "w") as f:
         ujson.dump(data, f)
+        f.flush()
+        _sync()
     try:
         os.remove(SETTINGS_FILE)
     except OSError:
         pass
     os.rename(tmp, SETTINGS_FILE)
+    _sync()
 
 def load_settings():
     data = None
+    corrupt = False
     try:
         with open(SETTINGS_FILE, "r") as f:
             data = ujson.load(f)
     except OSError:
         print("settings.json not found, creating defaults")
-    except Exception as e:
+    except ValueError as e:
+        # 只有 JSON 解析失败才算损坏
+        corrupt = True
         print("settings.json corrupt:", e)
+    except Exception as e:
+        # 内存不足等临时故障：本次用默认值，但绝不改动用户文件
+        print("settings.json read failed, using defaults this boot:", e)
+        return _defaults_copy()
+    if corrupt:
+        try:
+            os.remove("settings.json.bak")
+        except OSError:
+            pass
         try:
             os.rename(SETTINGS_FILE, "settings.json.bak")
             print("Corrupt settings backed up to settings.json.bak")
@@ -66,7 +89,21 @@ def load_settings():
         print("settings write:", e)
     return defaults
 
+def _valid_configs(configs):
+    if not isinstance(configs, list) or not configs:
+        return False
+    for cfg in configs:
+        if not isinstance(cfg, dict):
+            return False
+        if not isinstance(cfg.get("pin"), int):
+            return False
+    return True
+
 def save_settings(data):
+    if not isinstance(data, dict):
+        raise ValueError("settings payload must be an object")
+    if "button_configs" in data and not _valid_configs(data["button_configs"]):
+        raise ValueError("invalid button_configs")
     current = _defaults_copy()
     old_configs = None
     try:
@@ -78,8 +115,9 @@ def save_settings(data):
                     if key not in current:
                         current[key] = DEFAULT_SETTINGS[key]
                 old_configs = old.get("button_configs", [])
-    except:
-        pass
+    except Exception:
+        # 旧文件缺失或损坏：使用默认值继续保存
+        gc.collect()
     current.update(data)
     if "button_configs" in data and old_configs:
         new_configs = data["button_configs"]
@@ -90,5 +128,7 @@ def save_settings(data):
                         cfg["custom_events"] = old_configs[i]["custom_events"]
     try:
         _atomic_write(current)
-    except Exception as e:
-        print("settings write:", e)
+    except MemoryError:
+        # 堆碎片化时释放内存后重试一次
+        gc.collect()
+        _atomic_write(current)

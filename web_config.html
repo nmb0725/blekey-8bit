@@ -62,26 +62,26 @@ input[type=text],input[type=number],input[type=password]{width:100%;padding:5px;
 </div>
 <script>
 var M=[];
+var S=null;
 fetch('/api/settings').then(function(r){return r.json()}).then(function(d){
+  M=d.macros;S=d.settings;
   document.getElementById('ip').textContent='IP: '+(d.ip||'--');
+  render();
 });
-fetch('/api/macros').then(function(r){return r.json()}).then(function(d){M=d.macros;load()});
-function load(){
-  fetch('/api/settings').then(function(r){return r.json()}).then(function(d){
-    var s=d.settings,h='';
-    s.button_configs.forEach(function(c,i){
-      h+='<div class="row"><input id="p'+i+'" type="number" value="'+c.pin+'"><select id="m'+i+'">';
-      M.forEach(function(n){h+='<option'+(n==c.macro?' selected':'')+'>'+n+'</option>'});
-      h+='</select><a class="edit-btn" href="/editor?index='+i+'">✎</a></div>';
-    });
-    document.getElementById('btns').innerHTML=h;
-    document.getElementById('trigger').value=s.trigger_pins.join(',');
-    document.getElementById('longpress').value=s.long_press_ms;
-    document.getElementById('webhost').value=s.web_host||'0.0.0.0';
-    document.getElementById('webport').value=s.web_port||80;
-    document.getElementById('wifissid').value=s.wifi_ssid||'';
-    document.getElementById('wifipw').value=s.wifi_password||'';
+function render(){
+  var s=S,h='';
+  s.button_configs.forEach(function(c,i){
+    h+='<div class="row"><input id="p'+i+'" type="number" value="'+c.pin+'"><select id="m'+i+'">';
+    M.forEach(function(n){h+='<option'+(n==c.macro?' selected':'')+'>'+n+'</option>'});
+    h+='</select><a class="edit-btn" href="/editor?index='+i+'">✎</a></div>';
   });
+  document.getElementById('btns').innerHTML=h;
+  document.getElementById('trigger').value=s.trigger_pins.join(',');
+  document.getElementById('longpress').value=s.long_press_ms;
+  document.getElementById('webhost').value=s.web_host||'0.0.0.0';
+  document.getElementById('webport').value=s.web_port||80;
+  document.getElementById('wifissid').value=s.wifi_ssid||'';
+  document.getElementById('wifipw').value=s.wifi_password||'';
 }
 function getCfg(){
   var a=[],n=document.querySelectorAll('#btns .row').length;
