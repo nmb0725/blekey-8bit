@@ -31,6 +31,12 @@ input[type=text],input[type=number],input[type=password]{width:100%;padding:5px;
 #msg{padding:8px;margin:8px 0;border-radius:4px;display:none;font-size:13px}
 #msg.ok{display:block;background:#23863633;border:1px solid #238636;color:#3fb950}
 #msg.err{display:block;background:#d32f2f33;border:1px solid #d32f2f;color:#ff5252}
+.row .btn-label{flex:0 0 64px;font-size:12px;color:#888}
+.row .edit-btn[disabled]{opacity:0.3;cursor:not-allowed}
+.row .edit-btn[disabled]:hover{background:#222}
+.row input.bad,#trigger.bad,#longpress.bad,#webport.bad{border-color:#d32f2f;box-shadow:0 0 0 1px #d32f2f}
+.row input.good,#trigger.good,#longpress.good,#webport.good{border-color:#238636}
+.btn[disabled]{opacity:0.6;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -63,34 +69,105 @@ input[type=text],input[type=number],input[type=password]{width:100%;padding:5px;
 <script>
 var M=[];
 var S=null;
-fetch('/api/settings').then(function(r){return r.json()}).then(function(d){
+var dirty=false;
+var msgTimer=null;
+var saveBtn=document.querySelector('.btn-save');
+var rebootBtn=document.querySelector('.btn-reboot');
+function apiFetch(url,opts,noJson){
+  opts=opts||{};
+  return new Promise(function(res,rej){
+    var t=setTimeout(function(){rej(new Error('Timeout'))},8000);
+    fetch(url,opts).then(function(r){
+      clearTimeout(t);
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return noJson?r:r.json();
+    }).then(res).catch(function(e){clearTimeout(t);rej(e);});
+  });
+}
+function msg(t,c){
+  var e=document.getElementById('msg');e.className=c;e.textContent=t;
+  if(msgTimer){clearTimeout(msgTimer);msgTimer=null;}
+  if(c==='ok'){msgTimer=setTimeout(function(){e.className='';e.textContent='';},3000);}
+}
+function markDirty(){dirty=true;}
+function attachDirty(){
+  var els=document.querySelectorAll('#btns input,#btns select,#trigger,#longpress,#webhost,#webport,#wifissid,#wifipw');
+  for(var i=0;i<els.length;i++)els[i].addEventListener('change',markDirty);
+}
+function setBusy(b){
+  saveBtn.disabled=b;rebootBtn.disabled=b;
+  saveBtn.textContent=b?'Saving...':'Save';
+  rebootBtn.textContent=b?'Saving...':'Save & Reboot';
+}
+apiFetch('/api/settings').then(function(d){
   M=d.macros;S=d.settings;
   document.getElementById('ip').textContent='IP: '+(d.ip||'--');
-  render();
-});
+  render();attachDirty();
+}).catch(function(e){msg('Load failed: '+e.message,'err');});
 function render(){
   var s=S,h='';
   s.button_configs.forEach(function(c,i){
-    h+='<div class="row"><input id="p'+i+'" type="number" value="'+c.pin+'"><select id="m'+i+'">';
+    h+='<div class="row"><span class="btn-label">Button '+(i+1)+'</span>';
+    h+='<input id="p'+i+'" type="number" value="'+c.pin+'">';
+    h+='<select id="m'+i+'" onchange="onMacroChange('+i+')">';
     M.forEach(function(n){h+='<option'+(n==c.macro?' selected':'')+'>'+n+'</option>'});
-    h+='</select><a class="edit-btn" href="/editor?index='+i+'">✎</a></div>';
+    h+='</select>';
+    h+='<button class="edit-btn" id="e'+i+'" onclick="gotoEditor('+i+')">\u270e</button></div>';
   });
   document.getElementById('btns').innerHTML=h;
+  for(var i=0;i<s.button_configs.length;i++)updateEditBtn(i);
   document.getElementById('trigger').value=s.trigger_pins.join(',');
   document.getElementById('longpress').value=s.long_press_ms;
   document.getElementById('webhost').value=s.web_host||'0.0.0.0';
   document.getElementById('webport').value=s.web_port||80;
   document.getElementById('wifissid').value=s.wifi_ssid||'';
   document.getElementById('wifipw').value=s.wifi_password||'';
+  dirty=false;
+}
+function updateEditBtn(i){
+  var sel=document.getElementById('m'+i),btn=document.getElementById('e'+i);
+  if(!sel||!btn)return;
+  if(sel.value==='DISABLED'){btn.disabled=true;btn.title='Enable a macro first';}
+  else{btn.disabled=false;btn.title='Edit macro';}
+}
+function onMacroChange(i){updateEditBtn(i);markDirty();}
+function gotoEditor(i){
+  if(dirty&&!confirm('Unsaved changes, leave anyway?'))return;
+  location.href='/editor?index='+i;
+}
+function isUInt(v){return /^\d+$/.test(String(v).trim());}
+function checkNum(id,label,min,max){
+  var el=document.getElementById(id),v=el.value.trim(),good=isUInt(v);
+  if(good){var x=+v;if(x<min||(max!=null&&x>max))good=false;}
+  el.classList.toggle('bad',!good);el.classList.toggle('good',good);
+  return good?null:label+': invalid value';
+}
+function validate(){
+  var ok=true,err=null;
+  var n=document.querySelectorAll('#btns .row').length;
+  for(var i=0;i<n;i++){
+    var p=document.getElementById('p'+i),v=p.value.trim();
+    var good=v!==''&&isUInt(v);
+    p.classList.toggle('bad',!good);p.classList.toggle('good',good);
+    if(!good){ok=false;if(err===null)err='Button '+(i+1)+': invalid pin';}
+  }
+  var tp=document.getElementById('trigger'),parts=tp.value.split(','),clean=[],tbad=false;
+  for(var j=0;j<parts.length;j++){var t=parts[j].trim();if(t==='')continue;if(!isUInt(t)){tbad=true;break;}clean.push(t);}
+  var tog=!tbad&&clean.length>0;
+  tp.classList.toggle('bad',!tog);tp.classList.toggle('good',tog);
+  if(!tog){ok=false;if(err===null)err=tbad?'Trigger Pins: invalid value':'Trigger Pins: at least one required';}
+  var e2=checkNum('longpress','Long Press (ms)',1,null);if(e2){ok=false;if(err===null)err=e2;}
+  var e3=checkNum('webport','Web Port',1,65535);if(e3){ok=false;if(err===null)err=e3;}
+  if(!ok)msg(err||'Invalid input','err');
+  return ok;
 }
 function getCfg(){
   var a=[],n=document.querySelectorAll('#btns .row').length;
   for(var i=0;i<n;i++){
-    a.push({pin:+document.getElementById('p'+i).value,macro:document.getElementById('m'+i).value,custom_events:null})
+    a.push({pin:+document.getElementById('p'+i).value,macro:document.getElementById('m'+i).value,custom_events:null});
   }
-  return{button_configs:a,trigger_pins:document.getElementById('trigger').value.split(',').map(function(x){return +x.trim()}),long_press_ms:+document.getElementById('longpress').value,web_host:document.getElementById('webhost').value,web_port:+document.getElementById('webport').value,wifi_ssid:document.getElementById('wifissid').value,wifi_password:document.getElementById('wifipw').value}
+  return{button_configs:a,trigger_pins:document.getElementById('trigger').value.split(',').map(function(x){return x.trim()}).filter(function(x){return x!==''}).map(Number),long_press_ms:+document.getElementById('longpress').value,web_host:document.getElementById('webhost').value,web_port:+document.getElementById('webport').value,wifi_ssid:document.getElementById('wifissid').value,wifi_password:document.getElementById('wifipw').value};
 }
-function msg(t,c){var e=document.getElementById('msg');e.className=c;e.textContent=t}
 function togglePw(){
   var pw=document.getElementById('wifipw');
   var btn=document.getElementById('pwbtn');
@@ -103,13 +180,41 @@ function togglePw(){
   }
 }
 function save(){
-  var d=getCfg();
-  fetch('/api/settings',{method:'POST',body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){msg('Saved OK','ok')}).catch(function(e){msg('Error: '+e,'err')})
+  if(!validate())return;
+  setBusy(true);
+  apiFetch('/api/settings',{method:'POST',body:JSON.stringify(getCfg())}).then(function(d){
+    if(!d||d.ok===false)throw new Error('Save rejected by device');
+    msg('Saved OK','ok');dirty=false;
+  }).catch(function(e){msg('Error: '+e.message,'err');})
+  .then(function(){setBusy(false);});
 }
 function reboot(){
-  var d=getCfg();
-  fetch('/api/settings',{method:'POST',body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){fetch('/api/reboot',{method:'POST'})}).catch(function(e){msg('Error: '+e,'err')})
+  if(!validate())return;
+  setBusy(true);
+  apiFetch('/api/settings',{method:'POST',body:JSON.stringify(getCfg())}).then(function(d){
+    if(!d||d.ok===false)throw new Error('save');
+    dirty=false;
+    msg('Rebooting, waiting for device\u2026','ok');
+    return apiFetch('/api/reboot',{method:'POST'},true).catch(function(){});
+  }).then(function(){pollDevice();})
+  .catch(function(e){
+    if(e&&e.message==='save')msg('Save failed, reboot aborted','err');
+    else msg('Error: '+(e&&e.message),'err');
+    setBusy(false);
+  });
 }
+function pollDevice(){
+  var start=Date.now();
+  var iv=setInterval(function(){
+    apiFetch('/api/settings',{},true).then(function(){
+      clearInterval(iv);msg('Device is back','ok');
+      setTimeout(function(){location.reload();},1000);
+    }).catch(function(){
+      if(Date.now()-start>60000){clearInterval(iv);msg('Device not reachable after 60s, check the IP and refresh manually','err');setBusy(false);}
+    });
+  },2000);
+}
+window.onbeforeunload=function(){if(dirty)return 'Unsaved changes';};
 </script>
 </body>
 </html>

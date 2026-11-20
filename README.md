@@ -22,6 +22,7 @@ Wire physical buttons to ESP32 GPIO pins, and every press becomes a Bluetooth ke
 - **WiFi Web configuration**: hold the trigger keys for 3 s to enter config mode; edit pin assignment and macro bindings in a browser
 - **Online macro editor**: visually build key/mouse event sequences in the browser, including loading and editing single-key macros and reordering event rows
 - **Robust config mode**: BLE is suspended during configuration to free the shared radio; the web server has per-request timeouts, connection limits and low-heap protection
+- **Friendly web UI**: input validation with per-row error highlighting, unsaved-changes guard, request timeouts, and automatic reload when the device comes back after reboot
 - **LED status indication**: heartbeat / advertising blink / WiFi connecting / server state
 
 ### Requirements
@@ -172,6 +173,7 @@ MIT
 - **WiFi Web 配置**：长按触发键进入配置模式，浏览器中修改引脚分配和宏绑定
 - **在线宏编辑器**：Web 页面中可视化编辑按键事件序列，支持单键映射宏加载编辑、事件行排序
 - **稳健的配置模式**：配置期间自动关闭 BLE 释放共用射频，Web 服务器带请求超时、连接数上限与低堆保护
+- **友好的 Web 交互**：输入校验逐行标红报错、未保存修改离开前提醒、请求超时提示、设备重启后自动检测恢复并刷新页面
 - **LED 状态指示**：心跳常亮/广播闪烁/WiFi 连接中/服务器状态提示
 
 ### 硬件要求

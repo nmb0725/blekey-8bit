@@ -45,15 +45,19 @@ input[type=text],input[type=number]{padding:5px;background:#222;border:1px solid
 #msg.ok{display:block;background:#23863633;border:1px solid #238636;color:#3fb950}
 #msg.err{display:block;background:#d32f2f33;border:1px solid #d32f2f;color:#ff5252}
 #btn-info{color:#888;font-size:13px}
+#btn-macro{color:#58a6ff}
+.convert-hint{display:none;color:#888;font-size:12px;margin:4px 0;font-style:italic}
+.btn[disabled]{opacity:0.6;cursor:not-allowed}
 </style>
 </head>
 <body>
 <h1>Macro Editor</h1>
-<p id="btn-info">Button #<span id="btn-index">-</span> (Pin <span id="btn-pin">-</span>)</p>
+<p id="btn-info">Button #<span id="btn-index">-</span> (Pin <span id="btn-pin">-</span>) &mdash; macro: <span id="btn-macro">-</span></p>
 <div id='msg'></div>
+<div id='convert-hint' class='convert-hint'>Saving will convert this button to a CUSTOM macro</div>
 <h2>Events</h2>
 <div id='events'></div>
-<button class='btn btn-add' onclick='addEvent()'>+ Add Event</button>
+<button class='btn btn-add' onclick="addEvent();markDirty()">+ Add Event</button>
 <h2>Macro Settings</h2>
 <label>Auto Interval (ms, 0 = off)</label>
 <input id='auto_interval' type='number' value='0'>
@@ -67,12 +71,36 @@ input[type=text],input[type=number]{padding:5px;background:#222;border:1px solid
 </div>
 <div class='actions'>
 <button class='btn btn-save' onclick='saveMacro()'>Save</button>
-<button class='btn btn-back' onclick="location.href='/'">Back</button>
+<button class='btn btn-back' onclick="goBack()">Back</button>
 </div>
 <script>
 var idx=new URLSearchParams(location.search).get('index');
 document.getElementById('btn-index').textContent=idx;
 var ET=0;
+var dirty=false;
+var saving=false;
+var msgTimer=null;
+var saveBtn=document.querySelector('.btn-save');
+function apiFetch(url,opts,noJson){
+  opts=opts||{};
+  return new Promise(function(res,rej){
+    var t=setTimeout(function(){rej(new Error('Timeout'))},8000);
+    fetch(url,opts).then(function(r){
+      clearTimeout(t);
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return noJson?r:r.json();
+    }).then(res).catch(function(e){clearTimeout(t);rej(e);});
+  });
+}
+function markDirty(){dirty=true;}
+function goBack(){if(dirty&&!confirm('Unsaved changes, leave anyway?'))return;location.href='/';}
+function wireDirty(){
+  var ev=document.getElementById('events');
+  ev.addEventListener('input',markDirty);
+  ev.addEventListener('change',markDirty);
+  ev.addEventListener('click',function(e){if(e.target.closest('button'))markDirty();});
+  ['auto_interval','long_press','cancel'].forEach(function(id){document.getElementById(id).addEventListener('change',markDirty);});
+}
 var KEYCODES=[
   {l:'A',v:0x04},{l:'B',v:0x05},{l:'C',v:0x06},{l:'D',v:0x07},
   {l:'E',v:0x08},{l:'F',v:0x09},{l:'G',v:0x0A},{l:'H',v:0x0B},
@@ -103,16 +131,22 @@ var MODIFIERS=[
   {l:'Ctrl+Shift',v:3},{l:'Ctrl+Alt',v:5},{l:'Shift+Alt',v:6},
   {l:'Ctrl+Shift+Alt',v:7},{l:'Ctrl+Shift+Alt+Win',v:15}
 ];
-fetch('/api/settings').then(function(r){return r.json()}).then(function(d){
+apiFetch('/api/settings').then(function(d){
   var s=d.settings;
   var btn=s.button_configs[idx];
   document.getElementById('btn-pin').textContent=btn.pin;
+  document.getElementById('btn-macro').textContent=btn.macro||'--';
+  if(btn.macro&&btn.macro!=='CUSTOM'&&btn.macro!=='DISABLED'){
+    document.getElementById('convert-hint').style.display='block';
+  }
   if(btn.custom_events){
     loadMacro(btn.custom_events);
   }else if(btn.macro&&btn.macro!=='DISABLED'){
-    fetch('/api/macro/'+btn.macro).then(function(r){return r.json()}).then(function(m){loadMacro(m)});
+    apiFetch('/api/macro/'+btn.macro).then(function(m){loadMacro(m)}).catch(function(e){msg('Macro load failed: '+e.message,'err');});
   }
-});
+  wireDirty();
+  dirty=false;
+}).catch(function(e){msg('Load failed: '+e.message,'err');});
 function loadMacro(m){
   if(!m) return;
   document.getElementById('auto_interval').value=m.auto_interval||0;
@@ -243,6 +277,7 @@ function updateMoveButtons(){
   });
 }
 function saveMacro(){
+  if(saving)return;
   var events=[];
   document.querySelectorAll('.event-row').forEach(function(row){
     var type=row.querySelector('.evt-type').value;
@@ -279,14 +314,24 @@ function saveMacro(){
     long_press:document.getElementById('long_press').checked?1:0,
     cancel:document.getElementById('cancel').checked?1:0
   };
-  fetch('/api/settings').then(function(r){return r.json()}).then(function(d){
+  saving=true;saveBtn.disabled=true;saveBtn.textContent='Saving...';
+  apiFetch('/api/settings').then(function(d){
     var s=d.settings;
     s.button_configs[idx].macro='CUSTOM';
     s.button_configs[idx].custom_events=customData;
-    fetch('/api/settings',{method:'POST',body:JSON.stringify(s)}).then(function(r){return r.json()}).then(function(d){msg('Saved OK','ok')}).catch(function(e){msg('Error: '+e,'err')});
-  });
+    return apiFetch('/api/settings',{method:'POST',body:JSON.stringify(s)});
+  }).then(function(d){
+    if(!d||d.ok===false)throw new Error('Save rejected by device');
+    msg('Saved OK','ok');dirty=false;
+  }).catch(function(e){msg('Error: '+e.message,'err');})
+  .then(function(){saving=false;saveBtn.disabled=false;saveBtn.textContent='Save';});
 }
-function msg(t,c){var e=document.getElementById('msg');e.className=c;e.textContent=t}
+function msg(t,c){
+  var e=document.getElementById('msg');e.className=c;e.textContent=t;
+  if(msgTimer){clearTimeout(msgTimer);msgTimer=null;}
+  if(c==='ok'){msgTimer=setTimeout(function(){e.className='';e.textContent='';},3000);}
+}
+window.onbeforeunload=function(){if(dirty)return 'Unsaved changes';};
 </script>
 </body>
 </html>
